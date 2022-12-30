@@ -14,7 +14,9 @@
 #define N 10
 
 //useed to get a sleeptime of 0.1-2 milliseconds
-void msecSleep();
+void msecSleepParent();
+void msecSleepChild(){
+
 
 int main(int argc, char **argv)
 {
@@ -51,7 +53,7 @@ int main(int argc, char **argv)
 				printf("Sending %d\n", var1); fflush(stdout);
 				shmp->buffer[shmp->index] = var1;
 				shmp->full++;
-				msecSleep();
+				msecSleepParent();
 			} else { //if buffer is full
 				shmp->empty = 1;
 			}
@@ -67,7 +69,7 @@ int main(int argc, char **argv)
 				shmp->index = (shmp->index+1) % N; //making it circular, bounded by N(=10)
 				shmp->full--;
 				printf("Received %d\n", var2); fflush(stdout);
-				msecSleep();
+				msecSleepChild();
 			} else { //if buffer is empty
 				shmp->empty = 0;
 			}
@@ -77,8 +79,20 @@ int main(int argc, char **argv)
 	}
 }
 
-void msecSleep(){
-	int random = rand() % 1800;
+void msecSleepParent(){
+	int random = rand() % 500;
+	while (random < 100) {
+		random = rand() % 500;
+	}
 	//sleep in microseconds(10^(-6)) -> i multiply by 1000 to get milliseconds(10^(-3))
-	usleep(random*1000 + 100*1000);
+	usleep(random*1000);
+}
+
+void msecSleepChild(){
+	int random = rand() % 2000;
+	while (random < 200) {
+		random = rand() % 2000;
+	}
+	//sleep in microseconds(10^(-6)) -> i multiply by 1000 to get milliseconds(10^(-3))
+	usleep(random*1000);
 }
