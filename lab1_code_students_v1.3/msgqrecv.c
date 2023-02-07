@@ -9,7 +9,7 @@
 #define PERMS 0644
 struct my_msgbuf {
    long mtype;
-   long mint;
+   int mint;
 };
 
 int main(void) {
@@ -39,7 +39,7 @@ int main(void) {
       if (toend == -1)
         break;
 
-      printf("recvd: \"%ld\"\n", buf.mint);
+      printf("recvd: \"%d\"\n", buf.mint);
    }
    printf("message queue: done receiving messages.\n");
    system("rm msgq.txt");
