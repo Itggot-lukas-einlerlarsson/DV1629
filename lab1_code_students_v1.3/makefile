@@ -5,7 +5,7 @@ fork:
 matmulseq:
 	gcc -O2 -o app matmulseq.c -lpthread
 msgqrecv:
-	gcc -O2 -o app msgqrecv.c -lpthread
+	gcc -O2 -o recv msgqrecv.c -lpthread
 msgqsend:
 	gcc -O2 -o app msgqsend.c -lpthread
 pthreadcreate:
@@ -18,5 +18,7 @@ semaphore:
 	gcc -O2 -o app semaphore.c -lpthread
 shmem:
 	gcc -O2 -o app shmem.c -lpthread
+shmem_task3:
+	gcc -O2 -o app shmem_task3.c -lpthread
 run:
 	./app
