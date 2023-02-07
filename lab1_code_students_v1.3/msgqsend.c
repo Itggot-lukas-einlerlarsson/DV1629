@@ -12,7 +12,7 @@
 #define PERMS 0644
 struct my_msgbuf {
    long mtype;
-   char mint;
+   long mint;
 };
 
 int main(void) {
@@ -37,17 +37,23 @@ int main(void) {
 
    srand(time(NULL));
 
-   for (;;) {
+   for (int i; i = 50; i--) {
        // Random value to send
-       int res = rand();
+       unsigned res = rand();
        buf.mint = res;
 
-       printf("\tsent: %d\n", buf.mint);
+       printf("\tsent: %ld\n", buf.mint);
 
        // Send value to the message queue
        if (msgsnd(msqid, &buf, sizeof(buf.mint), 0) == -1)
            perror("msgsnd");
    }
+
+   buf.mint = -1;
+   len = sizeof(buf.mint);
+   if (msgsnd(msqid, &buf, len, 0) == -1) /* +1 for '\0' */
+      perror("msgsnd");
+
 
    // while(fgets(buf.mtext, sizeof buf.mtext, stdin) != NULL) {
    //    len = strlen(buf.mtext);
