@@ -22,10 +22,15 @@ unsigned odd(unsigned long num) {
 // simulate id performing 1000 transactions
 void do1000Transactions(unsigned long id) {
     for (int i = 0; i < 1000; i++) {
-        if (odd(id))
+        if (odd(id)){
+            pthread_mutex_lock(&lock);
             deposit(100.00); // odd threads deposit
-        else
+            pthread_mutex_unlock(&lock);
+        } else {
+            pthread_mutex_lock(&lock);
             withdraw(100.00); // even threads withdraw
+            pthread_mutex_unlock(&lock);
+        }
     }
 }
 
@@ -39,6 +44,7 @@ int main(int argc, char** argv) {
     pthread_t *children;
     unsigned long id = 0;
     unsigned long nThreads = 0;
+    pthread_mutex_init(&lock, 0);
     if (argc > 1)
         nThreads = atoi(argv[1]);
     children = malloc( nThreads * sizeof(pthread_t) );

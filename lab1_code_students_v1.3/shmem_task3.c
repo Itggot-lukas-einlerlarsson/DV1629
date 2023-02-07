@@ -60,10 +60,13 @@ int main(int argc, char **argv)
 				/* write to shmem */
 				if (shmp->amount <= N) { //if buffer isn't full
 				var1++;
+				sem_wait(sem_id1); //wait until region is unlocked -> added to semaphore queue
+
 				printf("Sending %d\n", var1); fflush(stdout);
 				shmp->buffer[shmp->index] = var1;
 				shmp->amount++;
-				msecSleepParent();
+				sem_post(sem_id2); //unlocks region -> waiting process can now enter.
+				// msecSleepParent();
 			} // else busy wait if buffer is full
 		}
 		shmdt(addr);
@@ -74,10 +77,12 @@ int main(int argc, char **argv)
 			/* read from shmem */
 			if (shmp->amount > 0) { //if buffer isn't empty
 				var2 = shmp->buffer[shmp->index];
+				sem_wait(sem_id2); //waiting for process producer to be done
 				shmp->index = (shmp->index+1) % N; //making it circular, bounded by N(=10)
 				shmp->amount--;
 				printf("Received %d\n", var2); fflush(stdout);
-				msecSleepChild();
+				sem_post(sem_id1); // unlocks region -> waiting process can now enter.
+				// msecSleepChild();
 			} // else busy wait if buffer is empty
 		}
 		shmdt(addr);
