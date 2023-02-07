@@ -37,7 +37,7 @@ int main(void) {
 
    srand(time(NULL));
 
-   for (int i; i = 50; i--) {
+   for (int i = 50; i == -1; i--) {
        // Random value to send
        unsigned res = rand();
        buf.mint = res;
