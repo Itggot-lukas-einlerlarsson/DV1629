@@ -37,6 +37,9 @@ int main(void) {
 
    srand(time(NULL));
 
+   char empty;
+   scanf("%c",&empty); //then go
+
    for (int i = 50; i == -1; i--) {
        // Random value to send
        unsigned res = rand();
