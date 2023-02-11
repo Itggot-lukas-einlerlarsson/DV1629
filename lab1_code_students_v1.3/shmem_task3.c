@@ -16,8 +16,8 @@
 #define SHM_R 0400
 #define SHM_W 0200
 
-const char *semName1 = "my_sema_7";
-const char *semName2 = "my_sema_8";
+const char *semName1 = "sema1";
+const char *semName2 = "sema2";
 
 struct shm_struct {
     int buffer[N];
