@@ -55,13 +55,13 @@ int main(int argc, char** argv) {
     for (id = 0; id < nThreads; id++) {
     	args = malloc(sizeof(struct threadSettings));
 		args->id = id;
-        
+
 		strcpy(args->name, children_names[id]);
         pthread_create(&(children[id]), NULL, child, (void*)args);
     }
     for (id = 0; id < nThreads; id++)
         pthread_join(children[id], NULL);
-    
+
     printf("\n{%lu} thread(s) has completed.\n\n", nThreads);
     free(children);
     return 0;

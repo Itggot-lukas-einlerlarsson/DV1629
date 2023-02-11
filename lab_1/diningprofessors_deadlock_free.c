@@ -104,7 +104,8 @@ void philosopher(int i, char* name) {
   char* right = "right";
   int checkChopsticks[2];
   // bool twoChopsticks = false;
-  while (1) {
+  int count = 0
+  while (count < 10) {
     // printf("hello from %s with pid: %d\n", name ,i);
     think(name);
     checkChopsticks[0] = take_chopstick(i, name, left); //left
@@ -116,6 +117,7 @@ void philosopher(int i, char* name) {
     }
     give_chopstick(i, name, left); //left
     give_chopstick((i+1)%N, name, right); //right
+    count++;
   }
 }
 
