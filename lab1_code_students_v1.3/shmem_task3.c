@@ -41,33 +41,35 @@ int main(int argc, char **argv)
 	//for sync of processess via semaphores:
 	const char *semName1 = "sema1";
 	const char *semName2 = "sema2";
-	sem_t *sem_id1 = sem_open(semName1, O_CREAT, O_RDWR, 10); // -> locked region, next process that waits() can enter and lock.
+	sem_t *sem_id1 = sem_open(semName1, O_CREAT, O_RDWR, 10);
 	sem_t *sem_id2 = sem_open(semName2, O_CREAT, O_RDWR, 0);
 
-
-	//used to get random nubmer for millisecond-sleep.
-	srand(time(NULL));
 
 	/* allocate a chunk of shared memory */
 	shmid = shmget(IPC_PRIVATE, SHMSIZE, IPC_CREAT | SHM_R | SHM_W);
 	shmp = (struct shm_struct *) shmat(shmid, addr, 0);
+	pid = fork();
+
 	shmp->index = 0;
 	shmp->amount = 0;
-	pid = fork();
+	//used to get random nubmer for millisecond-sleep.
+	srand(time(NULL));
+
 	if (pid != 0) {
 		/* here's the parent, acting as producer */
 		while (var1 < 100) {
-				/* write to shmem */
-				if (shmp->amount <= N) { //if buffer isn't full
-				var1++;
-				sem_wait(sem_id1); //wait until region is unlocked -> added to semaphore queue
+			/* write to shmem */
+			sem_wait(sem_id1); //wait until region is unlocked -> added to semaphore queue
+			var1++;
 
-				printf("Sending %d\n", var1); fflush(stdout);
-				shmp->buffer[shmp->index] = var1;
-				shmp->amount++;
-				sem_post(sem_id2); //unlocks region -> waiting process can now enter.
-				// msecSleepParent();
-			} // else busy wait if buffer is full
+			printf("Sending %d\n", var1); fflush(stdout);
+			shmp->buffer[shmp->index] = var1;
+			shmp->amount++;
+			shmp->index = (shmp->index+1) % N; //making it circular, bounded by N(=10)
+
+			msecSleepParent();
+
+			sem_post(sem_id2);//unlocks region -> waiting process can now enter.
 		}
 		shmdt(addr);
 		shmctl(shmid, IPC_RMID, shm_buf);
@@ -75,15 +77,16 @@ int main(int argc, char **argv)
 		/* here's the child, acting as consumer */
 		while (var2 < 100) {
 			/* read from shmem */
-			if (shmp->amount > 0) { //if buffer isn't empty
-				var2 = shmp->buffer[shmp->index];
-				sem_wait(sem_id2); //waiting for process producer to be done
-				shmp->index = (shmp->index+1) % N; //making it circular, bounded by N(=10)
-				shmp->amount--;
-				printf("Received %d\n", var2); fflush(stdout);
-				sem_post(sem_id1); // unlocks region -> waiting process can now enter.
-				// msecSleepChild();
-			} // else busy wait if buffer is empty
+			sem_wait(sem_id2);
+
+			var2 = shmp->buffer[shmp->index];
+			shmp->index = (shmp->index+1) % N; //making it circular, bounded by N(=10)
+			shmp->amount++;
+			printf("Received %d\n", var2); fflush(stdout);
+
+			msecSleepChild();
+			
+			sem_post(sem_id1);
 		}
 		shmdt(addr);
 		shmctl(shmid, IPC_RMID, shm_buf);
