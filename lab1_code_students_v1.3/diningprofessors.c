@@ -38,6 +38,11 @@ void philosopher(struct professorSettings* args) {
         printf("%s: get right chopstick -> eating\n", args->name);
         random = rand() % 5 + 5;
         sleep(random);
+
+        printf("%s: done eating -> give back chopsticks\n", args->name);
+        pthread_mutex_unlock(&lock[args->professorID]);
+        pthread_mutex_unlock(&lock[(args->professorID + 1) % N]);
+        printf("%s: chopsticks used and freed\n", args->name);
     }
 }
 
