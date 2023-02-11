@@ -20,5 +20,7 @@ shmem:
 	gcc -O2 -o app shmem.c -lpthread
 shmem_task3:
 	gcc -O2 -o app shmem_task3.c -lpthread
+diningprofessors:
+	gcc -O2 -o app diningprofessors.c -lpthread
 run:
 	./app

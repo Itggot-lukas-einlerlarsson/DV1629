@@ -19,6 +19,9 @@
 const char *semName1 = "sema1";
 const char *semName2 = "sema2";
 
+void msecSleepParent();
+void msecSleepChild();
+
 struct shm_struct {
     int buffer[N];
     int start;
@@ -51,11 +54,11 @@ int main() {
 			sem_wait(sem_id1);
 			var1++;
 
-			printf("Sending %d\n", var1); fflush(stdout);
+			printf("+Sending %d\n", var1); fflush(stdout);
 			shmp->buffer[shmp->end] = var1;
 			shmp->end = (shmp->end+1) % N;
 
-			msecSleepParent()
+			msecSleepParent();
 
 			// Post sem_id2 to increase semaphore value (allow it to start reading)
 			sem_post(sem_id2);
@@ -74,9 +77,9 @@ int main() {
 
             var2 = shmp->buffer[shmp->start];
             shmp->start = (shmp->start+1) % N;
-            printf("\tReceived %d\n", var2); fflush(stdout);
+            printf("-Received %d\n", var2); fflush(stdout);
 
-            msecSleepChild()
+            msecSleepChild();
 
             // Post sem_id1 to increase semaphore value (allow it to write more, can be up to 10, so if we read more, it is allowed to write more)
             sem_post(sem_id1);

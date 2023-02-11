@@ -2,94 +2,80 @@
 #include <stdlib.h>
 #include <time.h>
 #include <pthread.h>
+#include <string.h>
 
 // Shared Variables
-pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-double bankAccountBalance = 0;
+#define N 5
+pthread_mutex_t lock[N];
 
-//when a professor has both chopsticks he can eat -> otherwise not.
-//if the left chopstick is taken (1) -> the professor needs to wait and is next in queue.
-//if the right chopstick is taken (1) -> professor needs to wait and is next in queue i guess
-//
-int chopstick0 = 0;
-int chopstick1 = 0;
-int chopstick2 = 0;
-int chopstick3 = 0;
-int chopstick4 = 0;
+struct professorSettings{
+    unsigned int professorID;
+    char* name;
+};
+
+void philosopher(struct professorSettings* args);
+void* professor(void* params);
 
 
-void deposit(double amount) {
-    bankAccountBalance += amount;
-}
+void philosopher(struct professorSettings* args) {
+    int random;
+    while (1) {
+        // think(name);
+        // printf("hello from %s with pid: %d\n", args->name ,args->id);
+        printf("\n%s: thinking\n", args->name);
+        random = rand() % 3 + 1;
+        sleep(random);
 
-void withdraw(double amount) {
-    bankAccountBalance -= amount;
-}
+        printf("\n%s: try to get left chopstick\n", args->name);
+        pthread_mutex_lock(&lock[args->professorID]);
+        printf("\n%s: thinking -> got left chopstick\n", args->name);
+        printf("\n%s: got left chopstick -> thinking\n", args->name);
+        random = rand() % 6 + 2;
+        sleep(random);
 
-void think() {
-  int random = rand() % 8 + 2;
-  sleep(random);
-}
+        printf("\n%s: try to get left chopstick\n", args->name);
+        pthread_mutex_lock(&lock[(args->professorID + 1) % N]);
 
-// utility function to identify even-odd numbers
-unsigned odd(unsigned long num) {
-    return num % 2;
-}
-
-// simulate id performing 1000 transactions
-void dine(unsigned long id) {
-    for (int i = 0; i < 1000; i++) {
-      if (id == 0) {
-        printf("Tannenbaum\n", );
-      }
-      if (id == 1) {
-        printf("Bos\n", );
-      }
-      if (id == 2) {
-        printf("Lamport\n", );
-      }
-      if (id == 3) {
-        printf("Stallings\n", );
-      }
-      if (id == 4) {
-        printf("Silberschatz\n", );
-      }
-        if (odd(id)){
-            pthread_mutex_lock(&lock);
-            deposit(100.00); // odd threads deposit
-            pthread_mutex_unlock(&lock);
-        } else {
-            pthread_mutex_lock(&lock);
-            withdraw(100.00); // even threads withdraw
-            pthread_mutex_unlock(&lock);
-        }
+        printf("\n%s: thinking -> get right chopstick\n", args->name);
+        printf("\n%s: get right chopstick -> eating\n", args->name);
+        random = rand() % 5 + 5;
+        sleep(random);
     }
 }
 
-void* child(void* buf) {
-    unsigned long childID = (unsigned long)buf;
-    char* name = "childpild";
-    dine(childID);
+void* professor(void* params) {
+    struct professorSettings* args = (struct professorSettings*) params;
+    // unsigned int id = args->id;
+    philosopher(args);
+    // free(args);
     return NULL;
 }
 
-int main(int argc, char** argv) {
-    pthread_t *children;
+int main(int argc, char const *argv[]) {
+    //thread info
+    pthread_t *professors;
+    struct professorSettings* args;
     unsigned long id = 0;
-    unsigned long nThreads = 4;
+    unsigned long nThreads = N;
+    char* names[N] = {"Tannenbaum", "Bos", "Lamport", "Stallings", "Silberschatz"};
 
     //for random:
     srand(time(NULL));
 
-    pthread_mutex_init(&lock, 0);
-    children = malloc( nThreads * sizeof(pthread_t) );
-    for (id = 1; id < nThreads; id++)
-        pthread_create(&(children[id-1]), NULL, child, (void*)id);
-    dine(0); // main thread work (id=0)
-    for (id = 1; id < nThreads; id++)
-        pthread_join(children[id-1], NULL);
-    printf("\nThe final account balance with %lu threads is $%.2f.\n\n", nThreads, bankAccountBalance);
-    free(children);
-    pthread_mutex_destroy(&lock);
+    //creating threads
+    professors = malloc( nThreads * sizeof(pthread_t));
+    for (id = 0; id < nThreads; id++){
+        args = malloc(sizeof(struct professorSettings));
+        args->professorID = id;
+        // strcpy(args->name, names[id]);
+        args->name = names[id];
+        pthread_create(&(professors[id]), NULL, professor, (void*)args);
+    }
+    // philosopher(0, names[0]); // main thread work (id=0)
+
+    //termination of threads
+    for (id = 0; id < nThreads; id++)
+      pthread_join(professors[id], NULL);
+    free(professors);
     return 0;
 }
