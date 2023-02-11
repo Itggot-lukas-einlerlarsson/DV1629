@@ -22,5 +22,7 @@ shmem_task3:
 	gcc -O2 -o app shmem_task3.c -lpthread
 diningprofessors:
 	gcc -O2 -o app diningprofessors.c -lpthread
+lockfree:
+	gcc -O2 -o app diningprofessors_deadlockfree.c -lpthread
 run:
 	./app
