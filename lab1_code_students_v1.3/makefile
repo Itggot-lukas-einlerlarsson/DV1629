@@ -4,6 +4,12 @@ fork:
 	gcc -O2 -o app fork.c -lpthread
 matmulseq:
 	gcc -O2 -o app matmulseq.c -lpthread
+matmulseq_row:
+	gcc -O2 -o app matmulseq_row_parallell.c -lpthread
+matmulseq_init:
+	gcc -O2 -o app matmulseq_init_parallell.c -lpthread
+matmulseq_gran:
+	gcc -O2 -o app matmulseq_init_changeing_granularity.c -lpthread
 msgqrecv:
 	gcc -O2 -o recv msgqrecv.c -lpthread
 msgqsend:

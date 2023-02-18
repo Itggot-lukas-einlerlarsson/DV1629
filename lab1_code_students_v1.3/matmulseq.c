@@ -60,5 +60,5 @@ main(int argc, char **argv)
 {
     init_matrix();
     matmul_seq();
-    //print_matrix();
+    // print_matrix();
 }
