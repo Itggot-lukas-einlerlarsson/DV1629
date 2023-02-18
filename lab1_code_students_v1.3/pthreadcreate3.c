@@ -13,7 +13,6 @@ void* child(void* params) {
 	unsigned int childID = args->id;
 	unsigned int numThreads = args->numThreads;
 	args->squaredId = childID*childID;
-	// printf("args->squaredId #%u\n", args->squaredId);
 	printf("Greetings from child #%u of %u\n", childID, numThreads);
 	pthread_exit(&args->squaredId);
 }
@@ -41,11 +40,9 @@ int main(int argc, char** argv) {
 	printf("I am the parent (main) thread.\n");
 	for (unsigned int id = 0; id < numThreads; id++) {
 		pthread_join(children[id], (void**)&childIdSquares[id]);
+		printf("Child square id: %d\n", *childIdSquares[id]);
 	}
 	free(args); // deallocate args vector
 	free(children); // deallocate array
-	for (unsigned int id = 0; id < numThreads; id++) {
-		printf("Child square id: %d\n", *childIdSquares[id]);
-	}
 	return 0;
 }
