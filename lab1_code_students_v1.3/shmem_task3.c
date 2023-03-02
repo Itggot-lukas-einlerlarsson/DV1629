@@ -24,8 +24,8 @@ void msecSleepChild();
 
 struct shm_struct {
     int buffer[N];
-    int start;
-	int end;
+    int rear;
+	int front; 
 };
 
 int main() {
@@ -43,24 +43,19 @@ int main() {
 	shmid = shmget(IPC_PRIVATE, SHMSIZE, IPC_CREAT | SHM_R | SHM_W);
 	shmp = (struct shm_struct *) shmat(shmid, addr, 0);
 	pid = fork();
-
+    shmp->rear = 0;
+	shmp->front = 0;
     srand(time(NULL));
-
     if (pid != 0) {
 		/* here's the parent, acting as producer */
 		while (var1 < 100) {
 			/* write to shmem */
-			// Decrease value (write), if 0 (we've written up to the consumer, we wait)
 			sem_wait(sem_id1);
 			var1++;
-
 			printf("+Sending %d\n", var1); fflush(stdout);
-			shmp->buffer[shmp->end] = var1;
-			shmp->end = (shmp->end+1) % N;
-
+			shmp->buffer[shmp->front] = var1;
+			shmp->front = (shmp->front+1) % N;
 			msecSleepParent();
-
-			// Post sem_id2 to increase semaphore value (allow it to start reading)
 			sem_post(sem_id2);
 		}
 		shmdt(addr);
@@ -74,14 +69,10 @@ int main() {
 		/* here's the child, acting as consumer */
 		while (var2 < 100) {
 			sem_wait(sem_id2);
-
-            var2 = shmp->buffer[shmp->start];
-            shmp->start = (shmp->start+1) % N;
+            var2 = shmp->buffer[shmp->rear];
+            shmp->rear = (shmp->rear+1) % N;
             printf("-Received %d\n", var2); fflush(stdout);
-
-            msecSleepChild();
-
-            // Post sem_id1 to increase semaphore value (allow it to write more, can be up to 10, so if we read more, it is allowed to write more)
+            msecSleepChild(); // dont need to see if full, since child is sleeping with mutex locked
             sem_post(sem_id1);
 		}
 		shmdt(addr);
@@ -99,7 +90,6 @@ void msecSleepParent(){
 	while (random < 100) {
 		random = rand() % 500;
 	}
-	//sleep in microseconds(10^(-6)) -> i multiply by 1000 to get milliseconds(10^(-3))
 	usleep(random*1000);
 }
 

@@ -25,7 +25,6 @@ int main(int argc, char **argv)
 		int buffer[N];
 		int index;
 		int amount;
-		//int* front = buffer, rear = front; //starts as empty
 	};
 	volatile struct shm_struct *shmp = NULL;
 	char *addr = NULL;
