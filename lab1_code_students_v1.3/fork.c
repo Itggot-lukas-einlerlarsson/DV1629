@@ -23,7 +23,7 @@ int main(int argc, char **argv)
         for (i = 0; i < niterations; ++i)
             printf("B = %d, ", i);
         printf("child pid A = %d  |  ", pid);
-        printf("child pid2 B = %d", pid2);
+        printf("child pid2 C = %d", pid2);
     }
     printf("\n");
 }

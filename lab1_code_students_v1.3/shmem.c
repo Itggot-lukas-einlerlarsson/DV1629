@@ -13,17 +13,16 @@
 
 #define N 10
 
-//useed to get a sleeptime of 0.1-2 milliseconds
+//used to get sleeptime for child and parent
 void msecSleepParent();
 void msecSleepChild();
 
 
 int main(int argc, char **argv)
 {
-	/*	cirucular buffer , inspiration from s 142 in coursebook.*/
 	struct shm_struct {
 		int buffer[N];
-		int index;
+		int front, rear;
 		int amount;
 	};
 	volatile struct shm_struct *shmp = NULL;
@@ -32,24 +31,26 @@ int main(int argc, char **argv)
 	int var1 = 0, var2 = 0, shmid = -1;
 	struct shmid_ds *shm_buf;
 
-	//used to get random nubmer for millisecond-sleep.
+	//used to get random number for millisecond-sleep.
 	srand(time(NULL));
 
 	/* allocate a chunk of shared memory */
 	shmid = shmget(IPC_PRIVATE, SHMSIZE, IPC_CREAT | SHM_R | SHM_W);
 	shmp = (struct shm_struct *) shmat(shmid, addr, 0);
-	shmp->index = 0;
+	shmp->front = 0;
+	shmp->rear = 0;
 	shmp->amount = 0;
 	pid = fork();
 	if (pid != 0) {
 		/* here's the parent, acting as producer */
 		while (var1 < 100) {
 				/* write to shmem */
-				if (shmp->amount <= N) { //if buffer isn't full
+				if (shmp->amount < N) { //if buffer isn't full
 				var1++;
 				printf("Sending %d\n", var1); fflush(stdout);
-				shmp->buffer[shmp->index] = var1;
-				shmp->amount++;
+				shmp->buffer[shmp->front] = var1;
+				shmp->front = (shmp->front+1) % N; //making it circular, bounded by N(=10)
+				shmp->amount++; // the amount change can cause race condition
 				msecSleepParent();
 			} // else busy wait if buffer is full
 		}
@@ -60,9 +61,9 @@ int main(int argc, char **argv)
 		while (var2 < 100) {
 			/* read from shmem */
 			if (shmp->amount > 0) { //if buffer isn't empty
-				var2 = shmp->buffer[shmp->index];
-				shmp->index = (shmp->index+1) % N; //making it circular, bounded by N(=10)
-				shmp->amount--;
+				var2 = shmp->buffer[shmp->rear];
+				shmp->rear = (shmp->rear+1) % N; //making it circular, bounded by N(=10)
+				shmp->amount--; // the amount change can cause race condition
 				printf("Received %d\n", var2); fflush(stdout);
 				msecSleepChild();
 			} // else busy wait if buffer is empty
