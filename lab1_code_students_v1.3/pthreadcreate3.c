@@ -14,7 +14,8 @@ void* child(void* params) {
 	unsigned int numThreads = args->numThreads;
 	args->squaredId = childID*childID;
 	printf("Greetings from child #%u of %u\n", childID, numThreads);
-	pthread_exit(&args->squaredId);
+	// pthread_exit(&args->squaredId);
+	pthread_exit(NULL);
 }
 
 int main(int argc, char** argv) {
@@ -24,7 +25,7 @@ int main(int argc, char** argv) {
 	// get desired # of threads
 	if (argc > 1)
 		numThreads = atoi(argv[1]);
-	int* childIdSquares[numThreads];
+	// int* childIdSquares[numThreads];
 	children = malloc(numThreads * sizeof(pthread_t)); // allocate array of handles
 	args = malloc(numThreads * sizeof(struct threadArgs)); // args vector
 	for (unsigned int id = 0; id < numThreads; id++) {
@@ -36,11 +37,13 @@ int main(int argc, char** argv) {
 			NULL, // attributes of the child
 			child, // the function it should run
 			(void*)&args[id]); // args to that function
-	}
+	} 
 	printf("I am the parent (main) thread.\n");
 	for (unsigned int id = 0; id < numThreads; id++) {
-		pthread_join(children[id], (void**)&childIdSquares[id]);
-		printf("Child square id: %d\n", *childIdSquares[id]);
+		// pthread_join(children[id], (void**)&childIdSquares[id]);
+		// printf("Child square id: %d\n", *childIdSquares[id]); //printa struct argument childsquareID inte med pthread exit
+		pthread_join(children[id], NULL);
+		printf("Child square id: %d\n", args[id].squaredId);
 	}
 	free(args); // deallocate args vector
 	free(children); // deallocate array

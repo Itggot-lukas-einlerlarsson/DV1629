@@ -25,7 +25,7 @@ void msecSleepChild();
 struct shm_struct {
     int buffer[N];
     int rear;
-	int front; 
+	int front;
 };
 
 int main() {
@@ -38,6 +38,7 @@ int main() {
     /* initalize semaphores, first one to the size of the array */
 	sem_t *sem_id1 = sem_open(semName1, O_CREAT, O_RDWR, N);
 	sem_t *sem_id2 = sem_open(semName2, O_CREAT, O_RDWR, 0);
+    sem_t mutex;
 
 	/* allocate a chunk of shared memory */
 	shmid = shmget(IPC_PRIVATE, SHMSIZE, IPC_CREAT | SHM_R | SHM_W);
@@ -50,13 +51,15 @@ int main() {
 		/* here's the parent, acting as producer */
 		while (var1 < 100) {
 			/* write to shmem */
-			sem_wait(sem_id1);
 			var1++;
 			printf("+Sending %d\n", var1); fflush(stdout);
-			shmp->buffer[shmp->front] = var1;
+            sem_wait(sem_id1);
+            sem_wait(&mutex); // page 131 in coursebook
+			shmp->buffer[shmp->front] = var1; // mutex här
+            sem_post(&mutex);
+            sem_post(sem_id2);
 			shmp->front = (shmp->front+1) % N;
 			msecSleepParent();
-			sem_post(sem_id2);
 		}
 		shmdt(addr);
 		shmctl(shmid, IPC_RMID, shm_buf);
@@ -69,18 +72,20 @@ int main() {
 		/* here's the child, acting as consumer */
 		while (var2 < 100) {
 			sem_wait(sem_id2);
-            var2 = shmp->buffer[shmp->rear];
+            sem_wait(&mutex);
+            var2 = shmp->buffer[shmp->rear]; // mutex här
+            sem_post(&mutex);
+            sem_post(sem_id1);
             shmp->rear = (shmp->rear+1) % N;
             printf("-Received %d\n", var2); fflush(stdout);
             msecSleepChild(); // dont need to see if full, since child is sleeping with mutex locked
-            sem_post(sem_id1);
 		}
 		shmdt(addr);
 		shmctl(shmid, IPC_RMID, shm_buf);
     	sem_close(sem_id1);
 		sem_close(sem_id2);
 	}
-
+    sem_destroy(&mutex);
     return 0;
 }
 

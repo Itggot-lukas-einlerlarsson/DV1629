@@ -31,8 +31,8 @@ void philosopher(struct professorSettings* args) {
         random = rand() % 6 + 2;
         sleep(random);
         printf("%s: try to get right chopstick\n", args->name);
-        if (pthread_mutex_trylock(&lock[(args->professorID + 1) % N])) {
-            printf("%s: thinking -> get right chopstick\n", args->name);
+        if (pthread_mutex_trylock(&lock[(args->professorID + 1) % N])) { // hold and wait är det som gäller!
+            printf("%s: thinking -> get right chopstick\n", args->name); // preemption var om någon annan tråd "tjuvar resource"
             printf("%s: get right chopstick -> eating\n", args->name);
             random = rand() % 5 + 5;
             sleep(random);

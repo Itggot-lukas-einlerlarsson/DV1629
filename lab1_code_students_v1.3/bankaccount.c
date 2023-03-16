@@ -7,11 +7,15 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 double bankAccountBalance = 0;
 
 void deposit(double amount) {
-    bankAccountBalance += amount;
+    pthread_mutex_lock(&lock); // small and quick critical region lock
+    bankAccountBalance += amount; // shared variable being changed -> using mutual exclusion to keep it safe during read/write
+    pthread_mutex_unlock(&lock);// small and quick critical region unlock
 }
 
 void withdraw(double amount) {
-    bankAccountBalance -= amount;
+    pthread_mutex_lock(&lock); // small and quick critical region lock
+    bankAccountBalance -= amount;// shared variable being changed -> using mutual exclusion to keep it safe during read/write
+    pthread_mutex_unlock(&lock);// small and quick critical region unlock
 }
 
 // utility function to identify even-odd numbers
@@ -23,13 +27,9 @@ unsigned odd(unsigned long num) {
 void do1000Transactions(unsigned long id) {
     for (int i = 0; i < 1000; i++) {
         if (odd(id)){
-            pthread_mutex_lock(&lock);
             deposit(100.00); // odd threads deposit
-            pthread_mutex_unlock(&lock);
         } else {
-            pthread_mutex_lock(&lock);
             withdraw(100.00); // even threads withdraw
-            pthread_mutex_unlock(&lock);
         }
     }
 }
