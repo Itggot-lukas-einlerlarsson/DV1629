@@ -56,9 +56,9 @@ int main() {
             sem_wait(sem_id1);
             sem_wait(&mutex); // page 131 in coursebook
 			shmp->buffer[shmp->front] = var1; // mutex här
+            shmp->front = (shmp->front+1) % N;
             sem_post(&mutex);
             sem_post(sem_id2);
-			shmp->front = (shmp->front+1) % N;
 			msecSleepParent();
 		}
 		shmdt(addr);
@@ -74,11 +74,11 @@ int main() {
 			sem_wait(sem_id2);
             sem_wait(&mutex);
             var2 = shmp->buffer[shmp->rear]; // mutex här
+            shmp->rear = (shmp->rear+1) % N;
             sem_post(&mutex);
             sem_post(sem_id1);
-            shmp->rear = (shmp->rear+1) % N;
             printf("-Received %d\n", var2); fflush(stdout);
-            msecSleepChild(); // dont need to see if full, since child is sleeping with mutex locked
+            msecSleepChild();
 		}
 		shmdt(addr);
 		shmctl(shmid, IPC_RMID, shm_buf);
