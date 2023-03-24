@@ -5,6 +5,9 @@
 #define SIZE (32*1024)
 #define ITERATIONS 10
 
+// programmet allokerar minne i heap och sätter sedan alla tal till 0
+// görs i 10 iterationer.
+
 int main(int argc, char **argv)
 {
     struct link {

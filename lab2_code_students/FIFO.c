@@ -31,11 +31,11 @@ int main(int argc, char const* argv[]) {
                 memory_reference < page_queue[i] + page_size) {
                 in_frame = 1; // if in physical frame page
             }
-        }
+        } 
 
         if (!in_frame) { // if not in physical page frame -> page fault -> get rid of page put first in queue
             div_helper = memory_reference/page_size; // round memory to the page size it exists in AKA get rid of rest via integer division
-            memory_reference = div_helper * page_size;
+            memory_reference = div_helper * page_size; // jämnt delbart med pagesize -> representerar hela page
             page_queue[page_index] = memory_reference; // a new memory reference is added along with its page size.
             page_index = (page_index+1) % no_phys_pages; // go to next in queue
             no_page_faults++;

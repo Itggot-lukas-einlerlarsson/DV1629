@@ -6,6 +6,9 @@
 #define SIZE (16*1024)
 #define ITERATIONS 5
 
+// programmet allokerar dynamiskt minne genom calloc (heap)
+// sedan skickar den den informationen till en temporär fil
+
 int main(int argc, char **argv)
 {
     struct link {
