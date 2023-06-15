@@ -33,8 +33,11 @@ class FS {
 private:
     Disk disk;
     // size of a FAT entry is 2 bytes
-    int16_t fat[BLOCK_SIZE/2];
-    // std::string current_dir; //*** stack smashing detected ***: terminated av någon anledning.
+    // int16_t fat[BLOCK_SIZE/2];
+
+    //own:
+    std::string current_working_dir; //*** stack smashing detected ***: terminated av någon anledning.
+    uint16_t* fat;
 
 public:
     FS();
