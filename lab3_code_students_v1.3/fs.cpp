@@ -27,8 +27,13 @@ FS::format()
     delete[] root_dir;
 
     // block nr 1 is File Allocation Table
-    
-    // this.disk.write(FAT_BLOCK, fat);
+    uint16_t* fat = new uint16_t[BLOCK_SIZE/2]; // Whole FAT in one block, we can address 4096 / 2 = 2048 disk blocks in a partition
+    fat[0] = FAT_EOF; fat[1] = FAT_EOF; // first two blocks are occupied
+    for (size_t i = 2; i < BLOCK_SIZE/2; i++) {
+        fat[i] = FAT_FREE;
+    }
+    this->disk.write(FAT_BLOCK, (uint8_t*)fat);
+    delete[] fat;
     return 0;
 }
 
@@ -38,6 +43,28 @@ int
 FS::create(std::string filepath)
 {
     std::cout << "FS::create(" << filepath << ")\n";
+    if (filepath.size() > 55) {
+        std::cout << "Filename is too long (>55 characters)" << '\n';
+        return -1;
+    }
+    dir_entry* new_file = new dir_entry;
+    std::string filename = filepath.substr(filepath.find_last_of("/") + 1);
+    strncpy(new_file->file_name, filename.c_str(), sizeof(filename));
+    std::cout << new_file->file_name << '\n';
+    new_file->access_rights = READ + WRITE + EXECUTE; // Access rights of a file or directory should be ’rw-’ or ’rwx’ when the file or directory is created. (7)
+    std::string line;
+    std::string data;
+    std::getline(std::cin, line);
+    while(line != "") {
+        data += line + "\n";
+        std::getline(std::cin, line);
+    }
+    new_file->size = data.size();
+    std::cout << data << '\n';
+    delete new_file;
+
+    //write to disk....
+    // new_file->first_blk = ...;
     return 0;
 }
 
