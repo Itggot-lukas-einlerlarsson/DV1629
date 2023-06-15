@@ -16,6 +16,19 @@ int
 FS::format()
 {
     std::cout << "FS::format()\n";
+    // block nr 0 is root dir
+    dir_entry* root_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
+    for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
+        root_dir[i].size = 0;
+        root_dir[i].first_blk = ROOT_BLOCK;
+        root_dir[i].type = TYPE_DIR;
+    }
+    this->disk.write(ROOT_BLOCK, (uint8_t*)root_dir);
+    delete[] root_dir;
+
+    // block nr 1 is File Allocation Table
+    
+    // this.disk.write(FAT_BLOCK, fat);
     return 0;
 }
 

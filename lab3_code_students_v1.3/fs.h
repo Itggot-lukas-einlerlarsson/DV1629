@@ -16,6 +16,9 @@
 #define WRITE 0x02
 #define EXECUTE 0x01
 
+#define DIR_ENTRY_SIZE 64 //sizeof(test_dir)
+// #define MAX_NO_FILES_IN_DIR 64 //BLOCK_SIZE/sizeof(test_dir)
+
 struct dir_entry {
     char file_name[56]; // name of the file / sub-directory
     uint32_t size; // size of the file in bytes
@@ -29,6 +32,7 @@ private:
     Disk disk;
     // size of a FAT entry is 2 bytes
     int16_t fat[BLOCK_SIZE/2];
+    // std::string current_dir; //*** stack smashing detected ***: terminated av någon anledning.
 
 public:
     FS();
