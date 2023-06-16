@@ -2,10 +2,15 @@
 #include "fs.h"
 
 // todo: skapa help funktioner för:
+// --Ngt fucked händer när create har större size än 16 data bokstäver
 // 1. see om filepath är absolute filepath eller CWD filename
 //      detta möjligör detta lättare att förstå användarens input
 // 2. få vilket block man arbetar i för current directory
 //      detta gör att man lättare kan arbeta i CWD, underlättar massa redundans.
+// 3. kolla om filnamn redan finns i directory.
+// 4. det går enbart att skapa en fil utan att man fuckar upp minnet med sanitizer
+
+// g++ -std=c++11 -o filesystem main.o shell.o disk.o fs.o -fsanitize=address
 
 FS::FS()
 {
@@ -34,8 +39,8 @@ FS::format()
     delete[] root_dir;
     // block nr 1 is File Allocation Table
     uint8_t* fat = new uint8_t[BLOCK_SIZE]; // Whole FAT in one block, we can address 4096 / 2 = 2048 disk blocks in a partition
-    //disk write is not setup for BLOCK_SIZE/2 -> use uint8 instead -> BLOCK_SIZE max
     fat[0] = FAT_EOF; fat[1] = FAT_EOF; // first two blocks are occupied
+    //disk write is not setup for BLOCK_SIZE/2
     for (size_t i = 2; i < BLOCK_SIZE/2; i++) {
         fat[i] = FAT_FREE;
     }
@@ -50,7 +55,6 @@ FS::format()
 int
 FS::create(std::string filepath)
 {
-    std::cout << "FS::create(" << filepath << ")\n";
     if (filepath.size() > 55) {
         std::cout << "Filename is too long (>55 characters)" << '\n';
         return -1;
@@ -60,7 +64,6 @@ FS::create(std::string filepath)
     dir_entry* new_file = new dir_entry;
     std::string filename = filepath.substr(filepath.find_last_of("/") + 1);
     strncpy(new_file->file_name, filename.c_str(), sizeof(filename));
-    std::cout << new_file->file_name << '\n';
     new_file->access_rights = READ + WRITE + EXECUTE; // Access rights of a file or directory should be ’rw-’ or ’rwx’ when the file or directory is created. (7)
     new_file->type = TYPE_FILE;
     std::string line;
@@ -71,31 +74,45 @@ FS::create(std::string filepath)
         std::getline(std::cin, line);
     }
     new_file->size = data.size();
-    std::cout << data << '\n';
 
     // save entry on disk
-    float no_needed_blocks_fl = (float)data.size() / 4096;
-    int no_needed_blocks = ceil(no_needed_blocks_fl);
+    float no_needed_blocks_fl = (float)data.size() / BLOCK_SIZE;
+    int no_needed_blocks = 1 + floor(no_needed_blocks_fl);
+    // std::cout << no_needed_blocks << '\n';
     std::vector<int> free_blocks;
     uint8_t* fat = new uint8_t[BLOCK_SIZE];
-    int debug = this->disk.read(FAT_BLOCK, (uint8_t*)fat);
+    int debug = this->disk.read(FAT_BLOCK, fat);
     for (size_t i = 2; i < BLOCK_SIZE/2; i++) {
         if (fat[i] == FAT_FREE) {
-            if (no_needed_blocks > 0) { // kanske kolla om disk är full
+            if (no_needed_blocks > 1) {
                 free_blocks.push_back(i);
                 no_needed_blocks--;
             } else {
+                free_blocks.push_back(i);
                 break;
             }
         }
+        if (i == (BLOCK_SIZE/2-1)) {
+            std::cerr << "DISK is FULL!" << '\n';
+            delete[] fat;
+            return -1;
+        }
     }
     new_file->first_blk = free_blocks[0];
+    std::cout << "free_blocks:" << '\n';
+    std::cout << "size" << data.size() << '\n';
+    std::cout << "blocks to be used: ";
+    for (size_t i = 0; i < free_blocks.size(); i++) {
+        std::cout << free_blocks[i] << ' ';
+    }
+    std::cout << '\n';
     if (free_blocks.size() == 1) {
         fat[free_blocks[0]] = FAT_EOF;
         this->disk.write(free_blocks[0], (uint8_t*)(char*)data.c_str());
     } else {
         int temp_block = free_blocks[0];
         int current_block;
+        std::cout << no_needed_blocks << '\n';
         for (size_t i = 1; i < free_blocks.size(); i++) {
             current_block = temp_block;
             temp_block = free_blocks[i];
@@ -112,12 +129,14 @@ FS::create(std::string filepath)
     debug = this->disk.read(ROOT_BLOCK, (uint8_t*)root_dir);
     for (size_t i = 0; i < 64; i++) {
         if (root_dir[i].size == 0) {
-            root_dir[i] = *new_file;
+            // root_dir[i] = *new_file;
+            memcpy(&root_dir[i], new_file, sizeof(dir_entry));
+            break;
         }
     }
     for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         std::cout << root_dir[i].first_blk << ' ';
-    }
+    } std::cout << '\n';
     this->disk.write(ROOT_BLOCK, (uint8_t*)root_dir);
     delete new_file; delete[] root_dir;
     return 0;
@@ -129,29 +148,34 @@ FS::cat(std::string filepath)
 {
     dir_entry* root_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
     int debug = this->disk.read(ROOT_BLOCK, (uint8_t*)root_dir);
-    std::cout << "FS::cat(" << filepath << ")\n";
     int first_block;
     for (size_t i = 0; i < 64; i++) {
-        if (root_dir[i].file_name == filepath.c_str()) {
+        if (root_dir[i].file_name == filepath) {
+            std::cout << "shalom" << '\n';
             first_block = root_dir[i].first_blk;
         }
     }
     std::cout << first_block << '\n';
     delete[] root_dir;
-    uint8_t* fat = new uint8_t[BLOCK_SIZE/2];
+    uint8_t* fat = new uint8_t[BLOCK_SIZE];
     debug = this->disk.read(FAT_BLOCK, fat);
     int index = first_block;
-    std::vector<int> file_blocks;
-    while (fat[index] != FAT_EOF) {
-        file_blocks.push_back(fat[index]);
-        index = fat[index];
-    } file_blocks.push_back(fat[index]);
     uint8_t* block = new uint8_t[BLOCK_SIZE];
-    for (size_t i = 0; i < file_blocks.size(); i++) {
-        debug = this->disk.read(file_blocks[i], block);
-        std::string file_data = (char*)block;
-        std::cout << file_data << '\n';
-    }
+    debug = this->disk.read(first_block, block);
+    std::string file_data = (char*)block;
+    std::cout << file_data << '\n';
+
+    // std::vector<int> file_blocks; // to read
+    // while (fat[index] != FAT_EOF) {
+    //     file_blocks.push_back(fat[index]);
+    //     index = fat[index];
+    // }
+    // file_blocks.push_back(fat[index]);
+    // for (size_t i = 0; i < file_blocks.size(); i++) {
+    //     debug = this->disk.read(file_blocks[i], block);
+    //     std::string file_data = (char*)block;
+    //     std::cout << file_data << '\n';
+    // }
     delete[] fat, block;
     return 0;
 }
