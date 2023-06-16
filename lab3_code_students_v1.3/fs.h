@@ -3,6 +3,8 @@
 #include "disk.h"
 
 #include <cstring>
+#include <cmath>
+#include <vector>
 
 #ifndef __FS_H__
 #define __FS_H__
@@ -37,7 +39,7 @@ private:
 
     //own:
     std::string current_working_dir; //*** stack smashing detected ***: terminated av någon anledning.
-    uint16_t* fat;
+    // uint16_t* fat;
 
 public:
     FS();
