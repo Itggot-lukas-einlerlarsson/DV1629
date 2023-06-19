@@ -40,8 +40,10 @@ private:
     //own:
     std::string current_working_dir; //*** stack smashing detected ***: terminated av någon anledning.
     // uint16_t* fat;
+    std::string gather_into_new_dir_entry(int file_type, dir_entry* new_file, std::string filename);
 
 public:
+    // precreated
     FS();
     ~FS();
     // formats the disk, i.e., creates an empty file system

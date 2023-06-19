@@ -9,6 +9,7 @@
 //      detta gör att man lättare kan arbeta i CWD, underlättar massa redundans.
 // 3. kolla om filnamn redan finns i directory.
 // 4. det går enbart att skapa en fil utan att man fuckar upp minnet med sanitizer
+// 5. gå igenom memory leaks i create file
 
 // g++ -std=c++11 -o filesystem main.o shell.o disk.o fs.o -fsanitize=address
 
@@ -28,8 +29,9 @@ FS::format()
 {
     // block nr 0 is root dir
     dir_entry* root_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
+    // dir_entry tmp;
     for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
-        root_dir[i].file_name;
+        root_dir[i].file_name[0] = ' ';
         root_dir[i].size = 0;
         root_dir[i].first_blk = ROOT_BLOCK;
         root_dir[i].type = TYPE_DIR;
@@ -50,22 +52,11 @@ FS::format()
     return 0;
 }
 
-// create <filepath> creates a new file on the disk, the data content is
-// written on the following rows (ended with an empty row)
-int
-FS::create(std::string filepath)
-{
-    if (filepath.size() > 55) {
-        std::cout << "Filename is too long (>55 characters)" << '\n';
-        return -1;
-    }
-
+std::string FS::gather_into_new_dir_entry(int file_type, dir_entry* new_file, std::string filename){
     // gather info about dir entry
-    dir_entry* new_file = new dir_entry;
-    std::string filename = filepath.substr(filepath.find_last_of("/") + 1);
     strncpy(new_file->file_name, filename.c_str(), sizeof(filename));
     new_file->access_rights = READ + WRITE + EXECUTE; // Access rights of a file or directory should be ’rw-’ or ’rwx’ when the file or directory is created. (7)
-    new_file->type = TYPE_FILE;
+    new_file->type = file_type;
     std::string line;
     std::string data;
     std::getline(std::cin, line);
@@ -74,14 +65,52 @@ FS::create(std::string filepath)
         std::getline(std::cin, line);
     }
     new_file->size = data.size();
+    return data;
+}
+
+// create <filepath> creates a new file on the disk, the data content is
+// written on the following rows (ended with an empty row)
+int
+FS::create(std::string filepath)
+{
+    // gather info about dir entry
+    dir_entry* new_file = new dir_entry;
+    std::string filename;
+    if (filepath.find("/") == 0) {
+        filename = filepath;
+    } else {
+        filename = filepath.substr(filepath.find_last_of("/") + 1);
+    }
+    if (filename.size() > 55) {
+        std::cerr << "Filename is too long (>55 characters)" << '\n';
+        delete new_file;
+        return -1;
+    }
+    std::string data = this->gather_into_new_dir_entry(TYPE_FILE, new_file, filepath);
+
+    // see if in CWD, if not -> ok write.
+    dir_entry* root_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
+    int debug = this->disk.read(ROOT_BLOCK, (uint8_t*)root_dir);
+    // check if file already exists
+    for (size_t i = 0; i < 64; i++) {
+        if (strcmp(root_dir[i].file_name, new_file->file_name) == 0) {
+            if (new_file->type == TYPE_FILE) {
+                std::cerr << "There already exist a file with that name!" << '\n';
+            }
+            if (new_file->type == TYPE_DIR) {
+                std::cerr << "There already exist a directory with that name!" << '\n';
+            }
+            delete new_file; delete[] root_dir;
+            return -1;
+        }
+    }
 
     // save entry on disk
     float no_needed_blocks_fl = (float)data.size() / BLOCK_SIZE;
     int no_needed_blocks = 1 + floor(no_needed_blocks_fl);
-    // std::cout << no_needed_blocks << '\n';
     std::vector<int> free_blocks;
     uint8_t* fat = new uint8_t[BLOCK_SIZE];
-    int debug = this->disk.read(FAT_BLOCK, fat);
+    debug = this->disk.read(FAT_BLOCK, fat);
     for (size_t i = 2; i < BLOCK_SIZE/2; i++) {
         if (fat[i] == FAT_FREE) {
             if (no_needed_blocks > 1) {
@@ -99,37 +128,22 @@ FS::create(std::string filepath)
         }
     }
     new_file->first_blk = free_blocks[0];
-    std::cout << "free_blocks:" << '\n';
-    std::cout << "size" << data.size() << '\n';
-    std::cout << "blocks to be used: ";
-    for (size_t i = 0; i < free_blocks.size(); i++) {
-        std::cout << free_blocks[i] << ' ';
-    }
-    std::cout << '\n';
-    if (free_blocks.size() == 1) {
-        fat[free_blocks[0]] = FAT_EOF;
-        this->disk.write(free_blocks[0], (uint8_t*)(char*)data.c_str());
-    } else {
-        int temp_block = free_blocks[0];
-        int current_block;
-        std::cout << no_needed_blocks << '\n';
-        for (size_t i = 1; i < free_blocks.size(); i++) {
-            current_block = temp_block;
-            temp_block = free_blocks[i];
-            fat[current_block] = temp_block;
-            this->disk.write(current_block, (uint8_t*)(char*)data.substr(i*BLOCK_SIZE, (i+1)*BLOCK_SIZE).c_str());
+    int temp_block = free_blocks[0];
+    int current_block;
+    std::cout << no_needed_blocks << '\n';
+    for (size_t i = 1; i < free_blocks.size(); i++) {
+        current_block = temp_block;
+        temp_block = free_blocks[i];
+        fat[current_block] = temp_block;
+        this->disk.write(current_block, (uint8_t*)(char*)data.substr(i*BLOCK_SIZE, (i+1)*BLOCK_SIZE).c_str());
         }
-        fat[temp_block] = FAT_EOF;
-    }
+    fat[temp_block] = FAT_EOF;
     this->disk.write(FAT_BLOCK, (uint8_t*)fat);
     delete[] fat;
 
-    // update the directory currently in.
-    dir_entry* root_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
-    debug = this->disk.read(ROOT_BLOCK, (uint8_t*)root_dir);
+    //add to CWD
     for (size_t i = 0; i < 64; i++) {
         if (root_dir[i].size == 0) {
-            // root_dir[i] = *new_file;
             memcpy(&root_dir[i], new_file, sizeof(dir_entry));
             break;
         }
