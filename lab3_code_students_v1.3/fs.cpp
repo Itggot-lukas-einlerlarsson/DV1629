@@ -11,6 +11,7 @@
 // 4. det går enbart att skapa en fil utan att man fuckar upp minnet med sanitizer
 // 5. gå igenom memory leaks i create file
 // 6. ev. sätt data till BLOCK_SIZE
+// 7. Filnamn ska inte ha med sin directory i sig.
 
 // g++ -std=c++11 -o filesystem main.o shell.o disk.o fs.o -fsanitize=address
 
@@ -71,7 +72,7 @@ std::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, st
 
 int FS::check_if_file_in_CWD(dir_entry* current_working_dir, dir_entry* new_file){
     for (size_t i = 0; i < 64; i++) {
-        std::cout << current_working_dir[i].file_name << "\t" << new_file->file_name << '\n';
+        // std::cout << current_working_dir[i].file_name << "\t" << new_file->file_name << '\n';
         if (strcmp(current_working_dir[i].file_name, new_file->file_name) == 0) {
             if (new_file->type == TYPE_FILE) {
                 std::cerr << "There already exist a file with that name!" << '\n';
@@ -152,6 +153,7 @@ FS::create(std::string filepath)
         delete new_file;
         return -1;
     }
+    // filename = this->current_working_dir + filename;
     std::string data = this->gather_info_new_dir_entry(TYPE_FILE, new_file, filename);
 
     // see if in CWD, if not -> ok write.
@@ -183,22 +185,49 @@ FS::cat(std::string filepath)
 {
     dir_entry* root_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
     int debug = this->disk.read(ROOT_BLOCK, (uint8_t*)root_dir);
+
+    // gather input info
+    std::string filename;
+    if (filepath.at(0) == '/') {
+        filename = filepath.substr(filepath.find_last_of("/") + 1);
+    } else {
+        filename = filepath;
+    }
+    if (filename.size() > 55) {
+        std::cerr << "Filename is too long and doesn't exist (>55 characters)." << '\n';
+        delete[] root_dir;
+        return -1;
+    }
+
+    // see if file can be found and where its first block is
     int first_block;
+    int file_found = -1;
     for (size_t i = 0; i < 64; i++) {
-        if (root_dir[i].file_name == filepath) {
-            std::cout << "shalom" << '\n';
+        if (root_dir[i].file_name == filename) {
             first_block = root_dir[i].first_blk;
+            file_found = 0;
         }
     }
-    std::cout << first_block << '\n';
+    if (file_found != 0) {
+        delete[] root_dir;
+        std::cout << "file not found." << '\n';
+        return -1;
+    }
+    std::cout << "first block: " << first_block << '\n';
     delete[] root_dir;
+
+    // Read each block via FAT
     uint8_t* fat = new uint8_t[BLOCK_SIZE];
     debug = this->disk.read(FAT_BLOCK, fat);
-    int index = first_block;
     uint8_t* block = new uint8_t[BLOCK_SIZE];
-    debug = this->disk.read(first_block, block);
-    std::string file_data = (char*)block;
-    std::cout << file_data << '\n';
+    int index = first_block;
+    std::string file_data;
+    do {
+        debug = this->disk.read(index, block);
+        file_data = (char*)block;
+        std::cout << file_data << ' ';
+        index = fat[index];
+    } while (fat[index] != FAT_EOF || fat[index] != FAT_FREE);
 
     // std::vector<int> file_blocks; // to read
     // while (fat[index] != FAT_EOF) {
@@ -211,7 +240,7 @@ FS::cat(std::string filepath)
     //     std::string file_data = (char*)block;
     //     std::cout << file_data << '\n';
     // }
-    delete[] fat, block;
+    delete[] fat; delete block;
     return 0;
 }
 
