@@ -40,7 +40,10 @@ private:
     //own:
     std::string current_working_dir; //*** stack smashing detected ***: terminated av någon anledning.
     // uint16_t* fat;
-    std::string gather_into_new_dir_entry(int file_type, dir_entry* new_file, std::string filename);
+    std::string gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename);
+    int check_if_file_in_CWD(dir_entry* current_working_dir, dir_entry* new_file);
+    int save_entry_on_disk(std::string data, uint8_t* fat, dir_entry* new_file);
+    int save_entry_on_CWD(int current_dir_block, dir_entry* current_working_dir, dir_entry* new_file);
 
 public:
     // precreated
