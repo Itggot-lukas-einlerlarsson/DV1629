@@ -1,0 +1,27 @@
+RQ 1.1 How did the number of attacks change in relation to the increase of remote work? 15
+out of 81 (19%) reports reviewed in the first SLR showed that increase of remote workers had a profound 
+impact on the numbers of cyberattacks which e.g., drastically increased VPN attacks with 610% during 
+2020 [93]. Nuspire revealed an increase in attacks against Fortinet's SSL-VPN systems by 1919% and 
+1527% increase of attacks on Pulse Connect Secure VPNs during first quarter of 2021 [95]. 44% of the 
+companies surveyed by Zscaler witnessed an increase in exploits targeting their VPN since adopting to 
+remote work [8].
+The increase of remote work changed the VPN security landscape and caused a lot of turbulence 
+when the quick transition occurred. Many organizations were not prepared for the huge remote work 
+transition. This led to a wider attack range for all cyber adversaries that took advantage of every single 
+mistake, misconfiguration, vulnerability, and unsecure home network they could find in order to conduct 
+cyberattacks. 
+Cyber company Mandiant mentions that there might also exist more reasons for the increase in 
+attacks on VPNs [9]. They believe that threat actors recently realized the potential of getting access to 
+VPN networks. That it takes only one exploit or stolen credential to put an entire private network at risk, 
+which makes it ideal for cybercriminals to target remote users. This could then have been a motivating 
+factor, along with the remote work migration, which resulted in the significant increase of attacks against 
+VPN systems.
+RQ 1.2 Which tactics and techniques are used by threat actors? 45 out of 81 (55%) reports
+reviewed in the first SLR showed that the total cyberattacks skyrocketed with 75% increase in daily 
+cyberattacks and, at times, 300% during the shift to remote work [91] [126]. Our results also show that 
+many advanced persistent threat (APT) groups, that might be supported and sponsored by states, have 
+had espionage missions targeting healthcare organizations, governments, and research institutions that 
+for instance developed covid-19 vaccines [9]. This study shows that no one or nothing is completely 
+safe on the internet and any device can at any time be misused and turn the user into a victim of 
+cybercrime. In some cases, this occurs without the knowledge of the user, and it can take a long time 
+before the attack is detected and resolved.
