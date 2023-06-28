@@ -19,20 +19,7 @@
     //  filer större än BLOCK_SIZE funkar ej kekleon
     // det är inte fel på fat, det är fel på skrivningen.
 // 11. fixat, nu är det bara index som skrivs åt fel håll. ja eller så är det något somfortfarande är fel.
-
-
-//     d::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename){
-// d::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename){
-// d::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename){
-// d::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename){
-// d::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename){
-// d::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename){
-// d::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename){
-// d::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename){
-// d::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename){
-// d::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file
-
-
+// 12. När man skriver på disk sker ofta heap overflow med en karaktär. kolla upp detta sker även på klara.
 
 // g++ -std=c++11 -o filesystem main.o shell.o disk.o fs.o -fsanitize=address
 
@@ -40,6 +27,7 @@
 FS::FS()
 {
     std::cout << "FS::FS()... Creating file system\n";
+    // ' lägg in att current dir =/ och current block är ROOT_BLOCK
 }
 
 FS::~FS()
@@ -136,17 +124,6 @@ int FS::save_entry_on_disk(std::string data, int16_t* fat, dir_entry* new_file){
         std::cout << "freeblocks: " << free_blocks[i] << '\n';
     }
     new_file->first_blk = free_blocks[0];
-    // int temp_block = free_blocks[0];
-    // int current_block;
-    // do {
-    //     current_block = temp_block;
-    //     temp_block = free_blocks[count];
-    //     fat[current_block] = temp_block;
-    //     std::cout << "WRITING: in block " << current_block << ":\n"<< data.substr(count*BLOCK_SIZE, (count+1)*BLOCK_SIZE) << '\n';
-    //     this->disk.write(current_block, (uint8_t*)(char*)data.substr(count*BLOCK_SIZE, (count+1)*BLOCK_SIZE).c_str());
-    //     count++;
-    // } while(count < free_blocks.size());
-    // fat[temp_block] = FAT_EOF;
     if (free_blocks.size() == 1) {
         fat[free_blocks[0]] = FAT_EOF;
         std::cout << "WRITING: in block " << free_blocks[0] << ":\n"<< data << '\n';
@@ -156,29 +133,18 @@ int FS::save_entry_on_disk(std::string data, int16_t* fat, dir_entry* new_file){
         while (i <= free_blocks.size()) {
             if (i+1 < free_blocks.size()) {
                 fat[free_blocks[i]] = free_blocks[i+1];
-                std::cout << "WRITING: in block " << free_blocks[i] << ":\n"<< data.substr(i*BLOCK_SIZE, (i+1)*BLOCK_SIZE) << '\n';
+                std::cout << "WRITING: in block " << free_blocks[i] << "\n"<< data.substr(i*BLOCK_SIZE, (i+1)*BLOCK_SIZE) << '\n';
                 this->disk.write(free_blocks[i], (uint8_t*)(char*)data.substr(i*BLOCK_SIZE, (i+1)*BLOCK_SIZE).c_str());
                 i++;
             } else {
                 std::cout << "WRITING: in block " << free_blocks[i] << ":\n"<< data.substr(i*BLOCK_SIZE, (i+1)*BLOCK_SIZE) << '\n';
-                this->disk.write(free_blocks[i], (uint8_t*)(char*)data.substr(i*BLOCK_SIZE, (i+1)*BLOCK_SIZE).c_str());
+                this->disk.write(free_blocks[i], (uint8_t*)(char*)data.substr(i*BLOCK_SIZE, (i+1)*BLOCK_SIZE).c_str()); //EV ta bort i+1 här.
                 fat[free_blocks[i]] = FAT_EOF;
                 break;
             }
         }
     }
     this->disk.write(FAT_BLOCK, (uint8_t*)fat);
-    // for (size_t i = 0; i < free_blocks.size(); i++) {
-        //     current_block = temp_block;
-        //     temp_block = free_blocks[i];
-        //     fat[current_block] = temp_block;
-        //     std::cout << "WRITING: in block " << current_block << ":\n"<< data.substr(i*BLOCK_SIZE, (i+1)*BLOCK_SIZE) << '\n';
-        //     this->disk.write(current_block, (uint8_t*)(char*)data.substr(i*BLOCK_SIZE, (i+1)*BLOCK_SIZE).c_str());
-        // }
-    // std::cout << "FAT values: " << '\n';
-    // for (size_t i = 0; i < BLOCK_SIZE/2; i++) {
-    //     std::cout << fat[i] << ' ';
-    // }
     return 0;
 }
 
@@ -317,12 +283,90 @@ FS::ls()
     return 0;
 }
 
+std::string FS::gather_info_old_dir_entry(dir_entry* current_working_dir, dir_entry* new_file, std::string filename){
+    // see if file can be found and where its first block is
+    int index_block;
+    int file_size;
+    int debug;
+    for (size_t i = 0; i < 64; i++) {
+        if (current_working_dir[i].file_name == filename) {
+            index_block = current_working_dir[i].first_blk;
+            file_size = current_working_dir[i].size;
+            new_file->size = current_working_dir[i].size;
+            new_file->access_rights = current_working_dir[i].access_rights;
+            break;
+        }
+    }
+
+    // Read each block via FAT
+    uint8_t* tmp = new uint8_t[BLOCK_SIZE];
+    debug = this->disk.read(FAT_BLOCK, tmp);
+    int16_t* fat = (int16_t*)tmp;
+    uint8_t* block = new uint8_t[BLOCK_SIZE];
+    std::string file_data;
+    int count = 0;
+    do {
+        debug = this->disk.read(index_block, block);
+        std::cout << "index block " << index_block << ":\n";
+        file_data += (char*)block;
+        index_block = fat[index_block];
+        count++;
+    } while (index_block != FAT_EOF && index_block != FAT_FREE);
+    delete[] fat, block;
+    return file_data;
+}
+
+
 // cp <sourcepath> <destpath> makes an exact copy of the file
 // <sourcepath> to a new file <destpath>
 int
 FS::cp(std::string sourcepath, std::string destpath)
 {
-    std::cout << "FS::cp(" << sourcepath << "," << destpath << ")\n";
+    // gather info about dir entry
+    dir_entry* new_file = new dir_entry;
+    std::string sourcename, destname;
+    if (sourcepath.at(0) == '/') {
+        sourcename = sourcepath.substr(sourcepath.find_last_of("/") + 1);
+    } else {
+        sourcename = sourcepath;
+    }
+    if (destpath.at(0) == '/') {
+        destname = destpath.substr(destpath.find_last_of("/") + 1);
+    } else {
+        destname = destpath;
+    }
+    if (sourcename.size() > 55 || destname.size() > 55) {
+        std::cerr << "Filename of destination/source file is too long (>55 characters)" << '\n';
+        delete new_file;
+        return -1;
+    }
+    strncpy(new_file->file_name, destname.c_str(), sizeof(destname));
+    new_file->type = TYPE_FILE;
+    // see if in CWD, if not -> ok write.
+    dir_entry* root_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
+    int debug = this->disk.read(ROOT_BLOCK, (uint8_t*)root_dir);
+    // check if file already exists
+    if (check_if_file_in_CWD(root_dir, new_file) != 0) {
+        return -1;
+    }
+
+    // filename = this->current_working_dir + filename;
+    std::string data = this->gather_info_old_dir_entry(root_dir, new_file, sourcename);
+
+    // save entry on disk
+    // int16_t* fat = new int16_t[BLOCK_SIZE/2];
+    uint8_t* tmp = new uint8_t[4096];
+    debug = this->disk.read(FAT_BLOCK, tmp);
+    int16_t* fat = (int16_t*)tmp;
+    if (FS::save_entry_on_disk(data, fat, new_file) != 0) {
+        delete[] fat; delete new_file;
+        return -1;
+    }
+    delete[] fat;
+
+    //add to CWD
+    FS::save_entry_on_CWD(ROOT_BLOCK, root_dir, new_file);
+    delete new_file; delete[] root_dir;
     return 0;
 }
 
@@ -367,6 +411,7 @@ FS::cd(std::string dirpath)
 {
     // if current_working_dir == "/" -> ".." <=> "."
     // if current_working_dir != "/" -> ".." != "."
+    // if dir_path == "." return;
     std::cout << "FS::cd(" << dirpath << ")\n";
     return 0;
 }
