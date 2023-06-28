@@ -206,7 +206,7 @@ FS::create(std::string filepath)
 
     // save entry on disk
     // int16_t* fat = new int16_t[BLOCK_SIZE/2];
-    uint8_t* tmp = new uint8_t[4096];
+    uint8_t* tmp = new uint8_t[BLOCK_SIZE];
     debug = this->disk.read(FAT_BLOCK, tmp);
     int16_t* fat = (int16_t*)tmp;
     if (FS::save_entry_on_disk(data, fat, new_file) != 0) {
@@ -216,7 +216,7 @@ FS::create(std::string filepath)
     delete[] fat;
 
     //add to CWD
-    FS::save_entry_on_CWD(ROOT_BLOCK, root_dir, new_file);
+    debug = FS::save_entry_on_CWD(ROOT_BLOCK, root_dir, new_file);
     delete new_file; delete[] root_dir;
     return 0;
 }
@@ -379,7 +379,7 @@ FS::cp(std::string sourcepath, std::string destpath)
     dir_entry* root_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
     int debug = this->disk.read(ROOT_BLOCK, (uint8_t*)root_dir);
     // här behövs först kollas om source finns.
-    // if (check_if_file_in_CWD(root_dir, new_file->type, new_file->file_name) == 0) {
+    // if (check_if_file_in_CWD(root_dir, TYPE_FILE, sourcefile.c_str()) == 0) {
     //     delete[] root_dir; delete new_file;
     //     std::cout << "that sourcefile doesnt exist!" << '\n';
     //     return -1;
@@ -396,7 +396,7 @@ FS::cp(std::string sourcepath, std::string destpath)
 
     // save entry on disk
     // int16_t* fat = new int16_t[BLOCK_SIZE/2];
-    uint8_t* tmp = new uint8_t[4096];
+    uint8_t* tmp = new uint8_t[BLOCK_SIZE];
     debug = this->disk.read(FAT_BLOCK, tmp);
     int16_t* fat = (int16_t*)tmp;
     if (FS::save_entry_on_disk(data, fat, new_file) != 0) {
@@ -406,7 +406,7 @@ FS::cp(std::string sourcepath, std::string destpath)
     delete[] fat;
 
     //add to CWD
-    FS::save_entry_on_CWD(ROOT_BLOCK, root_dir, new_file);
+    debug = FS::save_entry_on_CWD(ROOT_BLOCK, root_dir, new_file);
     delete new_file; delete[] root_dir;
     return 0;
 }
@@ -420,13 +420,45 @@ FS::mv(std::string sourcepath, std::string destpath)
     std::string destname = get_filename(destpath);
     if (sourcename.size() > 55 || destname.size() > 55) {
         std::cerr << "Filename of destination/source file is too long (>55 characters)" << '\n';
-        // delete new_file;
         return -1;
     }
 
     //check if it exists in dir
+    dir_entry* root_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
+    int debug = this->disk.read(ROOT_BLOCK, (uint8_t*)root_dir);
+    // här behövs först kollas om source finns.
+    // if (check_if_file_in_CWD(root_dir, new_file->type, new_file->file_name) == 0) {
+    //     delete[] root_dir; delete new_file;
+    //     std::cout << "that sourcefile doesnt exist!" << '\n';
+    //     return -1;
+    // }
+    // see if dest in CWD, if not -> ok write.
 
-
+    for (size_t i = 0; i < 64; i++) {
+        // std::cout << current_working_dir[i].file_name << "\t" << new_file->file_name << '\n';
+        if (strcmp(root_dir[i].file_name, sourcename.c_str()) == 0) {
+            if (root_dir[i].type == TYPE_FILE) {
+                strncpy(root_dir[i].file_name, sourcename.c_str(), sizeof(sourcename));
+                this->disk.write(ROOT_BLOCK, (uint8_t*)root_dir);
+                delete[] root_dir;
+                return 0;
+            }
+            if (root_dir[i].type == TYPE_DIR) {
+                // dir_block = get_block_of_dir();
+                // dir_entry* new_file = new dir_entry;
+                // uint8_t* tmp = new uint8_t[BLOCK_SIZE];
+                // debug = this->disk.read(dir_block, tmp);
+                // int16_t* fat = (int16_t*)tmp;
+                // if (FS::save_entry_on_disk(data, fat, new_file) != 0) {
+                //     delete[] fat; delete new_file;
+                //     return -1;
+                // }
+                // delete[] fat;
+                std::cout << "shalom!" << '\n';
+            }
+            return -1;
+        }
+    }
     return 0;
 }
 
@@ -434,7 +466,51 @@ FS::mv(std::string sourcepath, std::string destpath)
 int
 FS::rm(std::string filepath)
 {
-    std::cout << "FS::rm(" << filepath << ")\n";
+    std::string filename = get_filename(filepath);
+    if (filename.size() > 55) {
+        std::cerr << "Filename is too long (>55 characters)" << '\n';
+        return -1;
+    }
+    // see if in CWD, if not -> ok write.
+    dir_entry* root_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
+    int debug = this->disk.read(ROOT_BLOCK, (uint8_t*)root_dir);
+    // check if file already exists
+    for (size_t i = 0; i < 64; i++) {
+        // std::cout << current_working_dir[i].file_name << "\t" << new_file->file_name << '\n';
+        if (strcmp(root_dir[i].file_name, filename.c_str()) == 0) {
+            if (root_dir[i].type == TYPE_FILE) {
+                int index_block;
+                index_block = root_dir[i].first_blk;
+                root_dir[i].file_name[0] = ' ';
+                root_dir[i].size = 0;
+                root_dir[i].first_blk = ROOT_BLOCK;
+                root_dir[i].type = TYPE_DIR;
+                root_dir[i].access_rights = READ + WRITE + EXECUTE;
+                this->disk.write(ROOT_BLOCK, (uint8_t*)root_dir);
+                uint8_t* tmp = new uint8_t[BLOCK_SIZE];
+                debug = this->disk.read(FAT_BLOCK, tmp);
+                int16_t* fat = (int16_t*)tmp; // ev delete tmp
+                // do {
+                //     index_block = fat[index_block];
+                //     fat[index_block] = FAT_FREE;
+                // } while(/* condition */);
+                int tmp_block;
+                while (index_block != FAT_EOF && index_block != FAT_FREE) {
+                    tmp_block = fat[index_block];
+                    fat[index_block] = FAT_FREE;
+                    index_block = tmp_block;
+                }
+                fat[index_block] = FAT_FREE; // recursive fat free.
+                this->disk.write(FAT_BLOCK, (uint8_t*)fat);
+                delete[] root_dir, fat;
+                return 0;
+            }
+            if (root_dir[i].type == TYPE_DIR) {
+                std::cerr << "This file is a directory!" << '\n';
+                return -1;
+            }
+        }
+    }
     return 0;
 }
 
