@@ -66,6 +66,16 @@ FS::format()
     return 0;
 }
 
+std::string FS::get_filename(std::string filepath) {
+    std::string filename;
+    if (filepath.at(0) == '/') {
+        filename = filepath.substr(filepath.find_last_of("/") + 1);
+    } else {
+        filename = filepath;
+    }
+    return filename;
+}
+
 std::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename){
     // gather info about dir entry
     strncpy(new_file->file_name, filename.c_str(), sizeof(filename));
@@ -169,12 +179,7 @@ FS::create(std::string filepath)
 {
     // gather info about dir entry
     dir_entry* new_file = new dir_entry;
-    std::string filename;
-    if (filepath.at(0) == '/') {
-        filename = filepath.substr(filepath.find_last_of("/") + 1);
-    } else {
-        filename = filepath;
-    }
+    std::string filename = get_filename(filepath);
     if (filename.size() > 55) {
         std::cerr << "Filename is too long (>55 characters)" << '\n';
         delete new_file;
@@ -324,17 +329,8 @@ FS::cp(std::string sourcepath, std::string destpath)
 {
     // gather info about dir entry
     dir_entry* new_file = new dir_entry;
-    std::string sourcename, destname;
-    if (sourcepath.at(0) == '/') {
-        sourcename = sourcepath.substr(sourcepath.find_last_of("/") + 1);
-    } else {
-        sourcename = sourcepath;
-    }
-    if (destpath.at(0) == '/') {
-        destname = destpath.substr(destpath.find_last_of("/") + 1);
-    } else {
-        destname = destpath;
-    }
+    std::string sourcename = get_filename(sourcepath);
+    std::string destname = get_filename(destpath);
     if (sourcename.size() > 55 || destname.size() > 55) {
         std::cerr << "Filename of destination/source file is too long (>55 characters)" << '\n';
         delete new_file;

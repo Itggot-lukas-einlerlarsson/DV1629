@@ -45,6 +45,7 @@ private:
     int check_if_file_in_CWD(dir_entry* current_working_dir, dir_entry* new_file);
     int save_entry_on_disk(std::string data, int16_t* fat, dir_entry* new_file);
     int save_entry_on_CWD(int current_dir_block, dir_entry* current_working_dir, dir_entry* new_file);
+    std::string get_filename(std::string filepath);
 
 public:
     // precreated
