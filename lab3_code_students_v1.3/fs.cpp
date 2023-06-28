@@ -82,7 +82,7 @@ std::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, st
     new_file->access_rights = READ + WRITE + EXECUTE; // Access rights of a file or directory should be ’rw-’ or ’rwx’ when the file or directory is created. (7)
     new_file->type = file_type;
     std::string line;
-    std::string data;
+    std::string data = "";
     std::getline(std::cin, line);
     while(line != "") {
         data += line + "\n";
@@ -90,7 +90,9 @@ std::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, st
     }
     std::cout << "sizeo: " <<  data.size() << '\n';
     std::cout << "max sizeo: " << data.max_size() << '\n';
-    data.resize(data.size()-1);
+    if (data.size() == 0) { // EV annars ta bort filen om den är för liten.
+        data.resize(data.size()+1, *" "); // size of file needs to be larger than 1.
+    }
     new_file->size = data.size();
     return data;
 }
@@ -134,6 +136,8 @@ int FS::save_entry_on_disk(std::string data, int16_t* fat, dir_entry* new_file){
         std::cout << "freeblocks: " << free_blocks[i] << '\n';
     }
     new_file->first_blk = free_blocks[0];
+    int writing_block_size = BLOCK_SIZE-1; //-1
+    std::string data_part;
     if (free_blocks.size() == 1) {
         fat[free_blocks[0]] = FAT_EOF;
         std::cout << "WRITING: in block " << free_blocks[0] << ":\n"<< data << '\n';
@@ -143,12 +147,15 @@ int FS::save_entry_on_disk(std::string data, int16_t* fat, dir_entry* new_file){
         while (i <= free_blocks.size()) {
             if (i+1 < free_blocks.size()) {
                 fat[free_blocks[i]] = free_blocks[i+1];
-                std::cout << "WRITING: in block " << free_blocks[i] << "\n"<< data.substr(i*BLOCK_SIZE, (i+1)*BLOCK_SIZE) << '\n';
-                this->disk.write(free_blocks[i], (uint8_t*)(char*)data.substr(i*BLOCK_SIZE, (i+1)*BLOCK_SIZE).c_str());
+                data_part = data.substr(i*writing_block_size, (i+1)*writing_block_size); // här ligger felet!
+                std::cout << "SIZEO:" << data_part.size() << '\n'; // här ligger felet!
+                std::cout << "WRITING: in block " << free_blocks[i] << "\n"<< data_part << '\n';
+                this->disk.write(free_blocks[i], (uint8_t*)(char*)data_part.c_str());
                 i++;
             } else {
-                std::cout << "WRITING: in block " << free_blocks[i] << ":\n"<< data.substr(i*BLOCK_SIZE, (i+1)*BLOCK_SIZE) << '\n';
-                this->disk.write(free_blocks[i], (uint8_t*)(char*)data.substr(i*BLOCK_SIZE, (i+1)*BLOCK_SIZE).c_str()); //EV ta bort i+1 här.
+                data_part = data.substr(i*writing_block_size, (i+1)*writing_block_size);
+                std::cout << "WRITING: in block " << free_blocks[i] << ":\n"<< data_part << '\n';
+                this->disk.write(free_blocks[i], (uint8_t*)(char*)data_part.c_str());
                 fat[free_blocks[i]] = FAT_EOF;
                 break;
             }
@@ -255,15 +262,15 @@ FS::cat(std::string filepath)
     // Read each block via FAT, EV har inte testat med flera blocks överskridandefiler
     uint8_t* tmp = new uint8_t[BLOCK_SIZE];
     debug = this->disk.read(FAT_BLOCK, tmp);
-    int16_t* fat = (int16_t*)tmp;
-    uint8_t* block = new uint8_t[BLOCK_SIZE];
+    int16_t* fat = (int16_t*)tmp; // EV delete tmp här.
+    uint8_t* block = new uint8_t[BLOCK_SIZE]; // EV -1 här.
     std::string file_data;
     int count = 0;
     do {
         debug = this->disk.read(index_block, block);
         std::cout << "index block " << index_block << ":\n";
         std::string file_data = (char*)block;
-        std::cout << file_data << '\n';
+        std::cout << file_data.size() << "\t:" << file_data << '\n';
         // std::cout << file_data.substr(0, std::min(file_size - BLOCK_SIZE*count, BLOCK_SIZE));
         // std::cout << file_data.substr(count*BLOCK_SIZE, (count+1)*BLOCK_SIZE) << '\n';
         index_block = fat[index_block];
@@ -347,7 +354,7 @@ std::string FS::gather_info_old_dir_entry(dir_entry* current_working_dir, dir_en
         index_block = fat[index_block];
         count++;
     } while (index_block != FAT_EOF && index_block != FAT_FREE);
-    delete[] fat, block;
+    delete[] fat, block; // här är det memory leaks någonstans EV
     return file_data;
 }
 
@@ -368,12 +375,19 @@ FS::cp(std::string sourcepath, std::string destpath)
     }
     strncpy(new_file->file_name, destname.c_str(), sizeof(destname));
     new_file->type = TYPE_FILE;
-    // see if in CWD, if not -> ok write.
+    // see if source in CWD, if not -> bad write.
     dir_entry* root_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
     int debug = this->disk.read(ROOT_BLOCK, (uint8_t*)root_dir);
-    // check if file already exists
+    // här behövs först kollas om source finns.
+    // if (check_if_file_in_CWD(root_dir, new_file->type, new_file->file_name) == 0) {
+    //     delete[] root_dir; delete new_file;
+    //     std::cout << "that sourcefile doesnt exist!" << '\n';
+    //     return -1;
+    // }
+    // see if dest in CWD, if not -> ok write.
     if (check_if_file_in_CWD(root_dir, new_file->type, new_file->file_name) != 0) {
         delete[] root_dir; delete new_file;
+        // double cout here, bad.
         return -1;
     }
 
