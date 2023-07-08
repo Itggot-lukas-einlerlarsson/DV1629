@@ -20,6 +20,7 @@
     // det är inte fel på fat, det är fel på skrivningen.
 // 11. fixat, nu är det bara index som skrivs åt fel håll. ja eller så är det något somfortfarande är fel.
 // 12. När man skriver på disk sker ofta heap overflow med en karaktär. kolla upp detta sker även på klara.
+// 13. när fil adderas till directory ska size ökas, annars börjar den på ett  pga ".." filen
 
 // g++ -std=c++11 -o filesystem main.o shell.o disk.o fs.o -fsanitize=address
 
@@ -247,6 +248,11 @@ FS::cat(std::string filepath)
     int file_size;
     for (size_t i = 0; i < 64; i++) {
         if (root_dir[i].file_name == filename) {
+            if (root_dir[i].type == TYPE_DIR) {
+                std::cout << "File is a directory." << '\n';
+                delete[] root_dir;
+                return -1;
+            }
             index_block = root_dir[i].first_blk;
             file_size = root_dir[i].size;
             file_found = 0;
@@ -284,21 +290,21 @@ FS::cat(std::string filepath)
 std::string FS::privilege_to_string(uint8_t privilege) {
     switch(privilege) {
         case 4:
-            return "r--";
+            return "r--"; // 100
         case 2:
-            return "-w-";
+            return "-w-"; // 010
         case 1:
-            return "--x";
+            return "--x"; // 001
         case 6:
-            return "rw-";
+            return "rw-"; // 110
         case 7:
-            return "rwx";
+            return "rwx"; // 111
         case 5:
-            return "r-x";
+            return "r-x"; // 101
         case 3:
-            return "-wx";
+            return "-wx"; // 011
     }
-    return "---";
+    return "---"; // 000
 }
 // ls lists the content in the currect directory (files and sub-directories)
 int
@@ -604,7 +610,63 @@ FS::append(std::string filepath1, std::string filepath2)
 int
 FS::mkdir(std::string dirpath)
 {
-    std::cout << "FS::mkdir(" << dirpath << ")\n";
+    // get one free block nr
+    // then write it to disk
+    // update FAT
+    std::string filename = get_filename(dirpath);
+    if (filename.size() > 55) {
+        std::cerr << "Filename is too long (>55 characters)" << '\n';
+        return -1;
+    }
+
+    // if absolute path -> here needs to attain correct filename and root block.
+    int debug;
+    uint8_t* tmp = new uint8_t[BLOCK_SIZE]; // behlöver deleteas. memory leaks.
+    debug = this->disk.read(FAT_BLOCK, tmp);
+    int16_t* fat = (int16_t*)tmp;
+    int free_block;
+    for (size_t i = 2; i < BLOCK_SIZE/2; i++) {
+        if (fat[i] == FAT_FREE) {
+            free_block = i;
+            break;
+        }
+        if (i == (BLOCK_SIZE/2-1)) {
+            std::cerr << "DISK is FULL!" << '\n';
+            return -1;
+        }
+    }
+
+    dir_entry* new_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
+    std::string prev_dir_name = "..";
+    strncpy(new_dir[0].file_name, prev_dir_name.c_str(), sizeof(prev_dir_name));
+    new_dir[0].size = 2;
+    new_dir[0].first_blk = ROOT_BLOCK; // previous block
+    new_dir[0].type = TYPE_DIR;
+    new_dir[0].access_rights = READ + WRITE + EXECUTE;
+    for (size_t i = 1; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
+        new_dir[i].file_name[0] = ' ';
+        new_dir[i].size = 0;
+        new_dir[i].first_blk = free_block;
+        new_dir[i].type = TYPE_DIR;
+        new_dir[i].access_rights = READ + WRITE + EXECUTE;
+    }
+
+    dir_entry* root_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
+    debug = this->disk.read(ROOT_BLOCK, (uint8_t*)root_dir);
+
+    dir_entry* new_file = new dir_entry;
+    strncpy(new_file->file_name, filename.c_str(), sizeof(filename));
+    new_file->size = BLOCK_SIZE/DIR_ENTRY_SIZE;
+    new_file->first_blk = free_block;
+    new_file->type = TYPE_DIR;
+    new_file->access_rights =  READ + WRITE + EXECUTE;
+    debug = FS::save_entry_on_CWD(ROOT_BLOCK, root_dir, new_file);
+    this->disk.write(free_block, (uint8_t*)new_dir);
+    fat[free_block] = FAT_EOF;
+    this->disk.write(FAT_BLOCK, (uint8_t*)fat);
+
+    delete[] fat, root_dir, new_dir;
+    delete new_file;
     return 0;
 }
 
@@ -612,6 +674,8 @@ FS::mkdir(std::string dirpath)
 int
 FS::cd(std::string dirpath)
 {
+    // get current dirpath
+    // get current disk block
     // if current_working_dir == "/" -> ".." <=> "."
     // if current_working_dir != "/" -> ".." != "."
     // if dir_path == "." return;
