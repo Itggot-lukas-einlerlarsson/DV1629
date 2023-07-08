@@ -21,6 +21,7 @@
 // 11. fixat, nu är det bara index som skrivs åt fel håll. ja eller så är det något somfortfarande är fel.
 // 12. När man skriver på disk sker ofta heap overflow med en karaktär. kolla upp detta sker även på klara.
 // 13. när fil adderas till directory ska size ökas, annars börjar den på ett  pga ".." filen
+// 14. mv behöver fixas, filer ändrar inte namn.
 
 // g++ -std=c++11 -o filesystem main.o shell.o disk.o fs.o -fsanitize=address
 
@@ -29,6 +30,8 @@ FS::FS()
 {
     std::cout << "FS::FS()... Creating file system\n";
     // ' lägg in att current dir =/ och current block är ROOT_BLOCK
+    current_dir_block = ROOT_BLOCK;
+    current_working_dir = "/";
 }
 
 FS::~FS()
@@ -445,7 +448,8 @@ FS::mv(std::string sourcepath, std::string destpath)
         // std::cout << current_working_dir[i].file_name << "\t" << new_file->file_name << '\n';
         if (strcmp(root_dir[i].file_name, sourcename.c_str()) == 0) {
             if (root_dir[i].type == TYPE_FILE) {
-                strncpy(root_dir[i].file_name, sourcename.c_str(), sizeof(sourcename));
+                std::cout << "destname:" <<destname << '\n';
+                strncpy(root_dir[i].file_name, destname.c_str(), sizeof(destname));
                 this->disk.write(ROOT_BLOCK, (uint8_t*)root_dir);
                 delete[] root_dir;
                 return 0;

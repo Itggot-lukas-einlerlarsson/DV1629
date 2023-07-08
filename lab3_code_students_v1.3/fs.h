@@ -38,6 +38,7 @@ private:
     // int16_t fat[BLOCK_SIZE/2];
 
     //own:
+    int current_dir_block;
     std::string current_working_dir; //*** stack smashing detected ***: terminated av någon anledning.
     // uint16_t* fat;
     std::string gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename);
