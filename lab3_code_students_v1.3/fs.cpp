@@ -398,7 +398,7 @@ FS::cp(std::string sourcepath, std::string destpath)
     if (check_if_file_in_CWD(root_dir, new_file->type, new_file->file_name) != 0) {
         std::cerr << "There already exist a file with that name!" << '\n';
         delete[] root_dir; delete new_file;
-        // double cout here, bad.
+        // EV: double cout here, bad.
         return -1;
     }
 
@@ -444,6 +444,11 @@ FS::mv(std::string sourcepath, std::string destpath)
         return -1;
     }
     // see if dest in CWD, if not -> ok write.
+    if (check_if_file_in_CWD(root_dir, TYPE_FILE, destname.c_str()) != 0) {
+        delete[] root_dir;
+        std::cout << "that destfile already exist!" << '\n';
+        return -1;
+    }
     for (size_t i = 0; i < 64; i++) {
         // std::cout << current_working_dir[i].file_name << "\t" << new_file->file_name << '\n';
         if (strcmp(root_dir[i].file_name, sourcename.c_str()) == 0) {
@@ -692,7 +697,7 @@ FS::cd(std::string dirpath)
 int
 FS::pwd()
 {
-    std::cout << "FS::pwd()\n";
+    std::cout << this->current_working_dir << '\n';
     return 0;
 }
 
@@ -702,5 +707,35 @@ int
 FS::chmod(std::string accessrights, std::string filepath)
 {
     std::cout << "FS::chmod(" << accessrights << "," << filepath << ")\n";
+    std::string filename = get_filename(filepath);
+    if (filename.size() > 55) {
+        std::cerr << "Filename of file is too long (>55 characters)" << '\n';
+        return -1;
+    }
+    if (std::stoi(accessrights) > 8 || std::stoi(accessrights) < 0) {
+        std::cout << "accessrights not implementable" << '\n';
+        return -1;
+    }
+    //check if it exists in dir
+    dir_entry* root_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
+    int debug = this->disk.read(ROOT_BLOCK, (uint8_t*)root_dir);
+    // här behövs först kollas om source finns.
+    if (check_if_file_in_CWD(root_dir, TYPE_FILE, filename.c_str()) == 0) {
+        delete[] root_dir;
+        std::cout << "that file doesnt exist!" << '\n';
+        return -1;
+    }
+
+    // see if dest in CWD, if not -> ok write.
+    for (size_t i = 0; i < 64; i++) {
+        // std::cout << current_working_dir[i].file_name << "\t" << new_file->file_name << '\n';
+        if (strcmp(root_dir[i].file_name, filename.c_str()) == 0) {
+            // doesnt matter dir/file
+            root_dir[i].access_rights = std::stoi(accessrights);
+            this->disk.write(ROOT_BLOCK, (uint8_t*)root_dir);
+            delete[] root_dir;
+            return 0;
+        }
+    }
     return 0;
 }
