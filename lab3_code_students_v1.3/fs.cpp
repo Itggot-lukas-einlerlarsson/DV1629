@@ -29,6 +29,10 @@
 // ska hantera /mnt/c/Users/lukas/Downloads/Assignments/VT23/OS/gh/DV1629/lab3_code_students_v1.3
 //      och /mnt/c/Users/lukas/Downloads/Assignments/VT23/OS/gh/DV1629/lab3_code_students_v1.3/
 // ev gör om current_dir_block och current_working_dir till this->
+// TODO: just nu, om dir inte finns så kmr den till root_dir, vilket är ok
+    //  --> viktigast, löser alla andra problem. men se om du kan göra så att cerr och returnerar "No such dir"
+    // sedan kan den föflytta sig mellan dir -> annat dir utan gå igenom root.
+    // CURRY//dir/test/test/test
 
 // g++ -std=c++11 -o filesystem main.o shell.o disk.o fs.o -fsanitize=address
 
@@ -732,7 +736,6 @@ int FS::get_dir_block(std::string dirpath) {
         }
         delete[] blk;
     }
-
     return current_dir_blk;
 }
 
@@ -762,27 +765,40 @@ FS::cd(std::string dirpath)
     int debug = this->disk.read(current_dir_block, (uint8_t*)dir);
     dir_entry* entry_handler = new dir_entry;
     // ATT GÖRA EV: fixa check_if_file_in_wanted_dir()
-    if (check_if_file_in_CWD(dir, TYPE_FILE, filename.c_str()) == 0) {
-        delete[] dir; delete entry_handler;
-        std::cout << "that directory doesnt exist!" << '\n';
-        return -1;
-    } // if input = ".."
+    // if (check_if_file_in_CWD(dir, TYPE_FILE, filename.c_str()) == 0) {
+    //     delete[] dir; delete entry_handler;
+    //     std::cout << "that directory doesnt exist!" << '\n';
+    //     return -1;
+    // }
     if (strcmp(dirpath.c_str(), previous_dir_str.c_str()) == 0) {
-        if (strcmp(current_working_dir.c_str(), root_dir_str.c_str()) == 0) {
-            delete[] dir; delete entry_handler;
-            return 0;
+        std::cout << dirpath << '\n';
+        std::cout << current_dir_block << '\n';
+        // if (strcmp(current_working_dir.c_str(), root_dir_str.c_str()) == 0) {
+        //     delete[] dir; delete entry_handler;
+        //     return 0;
+        // }
+        if (current_working_dir.find_last_of('/') > 0) {
+            current_working_dir = current_working_dir.substr(0, current_working_dir.find_last_of('/'));
+        } else {
+            current_working_dir = "/";
         }
         for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
             if (strcmp(dir[i].file_name, previous_dir_str.c_str()) == 0) {
                 memcpy(entry_handler, &dir[i], sizeof(dir_entry));
-                current_dir_block = ROOT_BLOCK;
-                current_working_dir = current_working_dir.substr(0, current_working_dir.find_last_of('/'));
+                current_dir_block = entry_handler->first_blk;
                 delete[] dir; delete entry_handler;
                 return 0;
             }
         }
     } else {
-        current_dir_block = get_dir_block(dirpath);
+        int prev_dir_block = current_dir_block;
+        int tmp_dir_block = get_dir_block(dirpath);
+        if (tmp_dir_block == -1) {
+            std::cerr << "The directory was not found." << '\n';
+            delete[] dir; delete entry_handler;
+            return -1;
+        }
+        current_dir_block = tmp_dir_block;
         // if absolute path...
         // if (dirpath.rfind("/", 0) == 0) {
         //     std::cout << "absolute path" << '\n';
@@ -792,11 +808,34 @@ FS::cd(std::string dirpath)
         //     std::cout << "relative path" << '\n';
         // }
         debug = this->disk.read(current_dir_block, (uint8_t*)dir);
+        // current_working_dir = current_working_dir + '/' + dirpath;
+        // det sombehöver fixas är kolla om dir finns eller inte!
+        // cd dir4
+// filesystem> pwd
+// //dir1/dir4
+// filesystem> ls
+// name                            type                    size                    first_blk                       accessrights
+// ..                      dir                     -                       0                       rwx
+// dir3                    dir                     -                       5                       rwx
+// filesystem> pwd
+//dir1/dir4
+        if (prev_dir_block == current_dir_block) {
+            ;
+        } else {
+            if (dirpath.rfind("/", 0) == 0) {
+                current_working_dir = dirpath;
+            } else {
+                if (strcmp(dirpath.c_str(), root_dir_str.c_str()) == 0) {
+                    current_working_dir = current_working_dir + dirpath;
+                } else {
+                    current_working_dir = current_working_dir + '/' + dirpath;
+                }
+            }
+        }
         for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
             if (strcmp(dir[i].file_name, filename.c_str()) == 0) {
                 memcpy(entry_handler, &dir[i], sizeof(dir_entry));
                 current_dir_block = entry_handler->first_blk;
-                current_working_dir = dirpath;
                 delete[] dir; delete entry_handler;
                 return 0;
             }
@@ -823,11 +862,16 @@ FS::pwd()
 int
 FS::chmod(std::string accessrights, std::string filepath)
 {
-    std::cout << "FS::chmod(" << accessrights << "," << filepath << ")\n";
     std::string filename = get_filename(filepath);
     if (filename.size() > 55) {
         std::cerr << "Filename of file is too long (>55 characters)" << '\n';
         return -1;
+    }
+    for (size_t i = 0; i < accessrights.size(); i++) {
+        if (accessrights[i] < '0' || accessrights[i] > '9' ) {
+            std::cerr << "accessrights aren't numerical." << '\n';
+            return -1;
+        }
     }
     if (std::stoi(accessrights) > 8 || std::stoi(accessrights) < 0) {
         std::cout << "accessrights not implementable" << '\n';
