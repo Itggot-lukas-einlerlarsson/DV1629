@@ -49,7 +49,7 @@ private:
     int save_entry_on_CWD(int current_dir_block, dir_entry* current_working_dir, dir_entry* new_file);
     std::string get_filename(std::string filepath);
     std::string privilege_to_string(uint8_t privilege);
-    int get_dir_block(std::string dirpath);
+    std::vector<int> get_dir_blocks(std::string dirpath);
 
 public:
     // precreated
