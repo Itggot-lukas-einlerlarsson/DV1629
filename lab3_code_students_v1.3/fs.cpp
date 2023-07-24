@@ -36,6 +36,13 @@
 
 // g++ -std=c++11 -o filesystem main.o shell.o disk.o fs.o -fsanitize=address
 
+// runtests:
+// failade att ta hand om det finns mer än 64 entries i en dir
+// rm måste kolla om filen finns först..
+// mkdir måste kolla om fil redan finns..
+// pwd verkar inte fungera korrekt om man går tbx till root dir
+// behöver fixa privilegium kontroller.
+
 
 FS::FS()
 {
