@@ -41,7 +41,7 @@
 // rm måste kolla om filen finns först..
 // mkdir måste kolla om fil redan finns..
 // pwd verkar inte fungera korrekt om man går tbx till root dir
-// behöver fixa privilegium kontroller.
+// behöver fixa privilegium kontroller..
 
 
 FS::FS()
