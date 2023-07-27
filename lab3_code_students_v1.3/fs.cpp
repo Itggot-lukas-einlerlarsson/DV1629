@@ -48,7 +48,8 @@
 // TASK 2:
 // Khorosho
 // TASK 3:
-//
+// absolute paths: cp och mv OK, kvar: create, rm, append, cat, ls, chmod, mkdir
+// gör hjälp funktioner när du arbetar med absolute paths.
 
 
 FS::FS()
