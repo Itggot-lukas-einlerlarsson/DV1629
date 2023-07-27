@@ -90,6 +90,7 @@ FS::format()
     // std::cout << '\n';
     this->disk.write(FAT_BLOCK, (uint8_t*)fat);
     this->current_working_dir = "/";
+    this->current_dir_block = ROOT_BLOCK;
     delete[] fat;
     return 0;
 }
@@ -361,7 +362,7 @@ FS::ls()
 {
     dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
     int debug = this->disk.read(current_dir_block, (uint8_t*)dir);
-    std::cout << "name \ttype\tsize\taccessrights" << '\n';
+    std::cout << "name \ttype\tsize\taccessrights\tfirst block" << '\n';
     // std::cout << "name\t\t\t\ttype\t\t\tsize\t\t\tfirst_blk\t\t\taccessrights" << '\n';
     for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         if (dir[i].size != 0) {
@@ -373,8 +374,8 @@ FS::ls()
                 std::cout << "dir" << "\t";
                 std::cout << "-" << "\t";
             }
-            // std::cout << dir[i].first_blk << "\t\t\t";
-            std::cout << privilege_to_string(dir[i].access_rights) << "\n";
+            std::cout << privilege_to_string(dir[i].access_rights) << "\t\t";
+            std::cout << dir[i].first_blk << "\n";
             // std::cout << root_dir[i].file_name << '\t' << root_dir[i].size << '\t' << root_dir[i].first_blk << '\t' << root_dir[i].type << '\t' << root_dir[i].access_rights << '\n';
         }
     }
@@ -430,10 +431,6 @@ FS::cp(std::string sourcepath, std::string destpath)
         delete new_file;
         return -1;
     }
-    if (this->check_if_dir_full(current_dir_block) == -1) {
-        std::cerr << "Directory is full!" << '\n';
-        return -1;
-    }
     new_file->type = TYPE_FILE;
     // see if source in CWD, if not -> bad write.
     dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
@@ -462,18 +459,24 @@ FS::cp(std::string sourcepath, std::string destpath)
     if (destdir_bool == 0) {
         strncpy(new_file->file_name, sourcename.c_str(), sizeof(sourcename));
         // dest is directory, get block
+        // int original_block = current_dir_block;
         std::string original_path = current_working_dir;
         std::vector<int> blocks = get_dir_blocks(destpath);
         current_working_dir = original_path;
+        // current_dir_block = original_block;
         for (size_t i = 0; i < blocks.size(); i++) {
             if (blocks[i] == -1) {
                 std::cerr << "Directory was not found." << '\n';
-                delete[] dir; delete new_file;
+                delete[] dir, destdir; delete new_file;
                 return -1;
             }
         }
         if (blocks[blocks.size()-1] != -1 || blocks.empty() == false) {
             dir_block = blocks[blocks.size()-1];
+        }
+        if (this->check_if_dir_full(dir_block) == -1) {
+            std::cerr << "Directory is full!" << '\n';
+            return -1;
         }
         // see if file already in dest directory
         debug = this->disk.read(dir_block, (uint8_t*)destdir);
@@ -484,6 +487,10 @@ FS::cp(std::string sourcepath, std::string destpath)
         }
     } else {
         strncpy(new_file->file_name, destname.c_str(), sizeof(destname));
+        if (this->check_if_dir_full(current_dir_block) == -1) {
+            std::cerr << "Directory is full!" << '\n';
+            return -1;
+        }
         // see if dest in CWD, if not -> ok write.
         if (check_if_file_in_CWD(dir, new_file->type, new_file->file_name) != 0) {
             std::cerr << "There already exist a file with that name." << '\n';
@@ -534,43 +541,97 @@ FS::mv(std::string sourcepath, std::string destpath)
     }
     //check if it exists in dir
     dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
+    dir_entry* destdir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
     int debug = this->disk.read(current_dir_block, (uint8_t*)dir);
-    // här behövs först kollas om source finns.
+    // Check if source exist.
     if (check_if_file_in_CWD(dir, TYPE_FILE, sourcename.c_str()) == 0) {
-        delete[] dir;
-        std::cerr << "that sourcefile doesnt exist!" << '\n';
+        delete[] dir, destdir;
+        std::cerr << "That sourcefile doesnt exist." << '\n';
         return -1;
     }
-    // see if dest in CWD, if not -> ok write.
-    if (check_if_file_in_CWD(dir, TYPE_FILE, destname.c_str()) != 0) {
-        delete[] dir;
-        std::cerr << "that destfile already exist!" << '\n';
-        return -1;
+    // see if destname is a dir
+    int destdir_bool = -1;
+    int dir_block = current_dir_block;
+    if (destpath.find("/") != std::string::npos) {
+        destdir_bool = 0;
+    } else {
+        for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
+            if (strcmp(dir[i].file_name, destname.c_str()) == 0) {
+                if (dir[i].type == TYPE_DIR) {
+                    destdir_bool = 0;
+                }
+            }
+        }
     }
+    if (destdir_bool == 0) {
+        // dest is directory, get block
+        // int original_block = current_dir_block;
+        std::string original_path = current_working_dir;
+        std::vector<int> blocks = get_dir_blocks(destpath);
+        current_working_dir = original_path;
+        // current_dir_block = original_block;
+        for (size_t i = 0; i < blocks.size(); i++) {
+            if (blocks[i] == -1) {
+                std::cerr << "Directory was not found." << '\n';
+                delete[] dir, destdir;
+                return -1;
+            }
+        }
+        if (blocks[blocks.size()-1] != -1 || blocks.empty() == false) {
+            dir_block = blocks[blocks.size()-1];
+        }
+        // see if file already in dest directory
+        debug = this->disk.read(dir_block, (uint8_t*)destdir);
+        if (check_if_file_in_CWD(destdir, TYPE_FILE, destname.c_str()) != 0) {
+            std::cerr << "There already exist a file with that name in that directory." << '\n';
+            delete[] dir, destdir;
+            return -1;
+        }
+    } else {
+        // see if dest in CWD, if not -> ok write.
+        if (check_if_file_in_CWD(dir, TYPE_FILE, destname.c_str()) != 0) {
+            std::cerr << "There already exist a file with that name." << '\n';
+            delete[] dir, destdir;
+            return -1;
+        }
+    }
+    dir_entry* entry_handler = new dir_entry;
     for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         if (strcmp(dir[i].file_name, sourcename.c_str()) == 0) {
             if (dir[i].type == TYPE_FILE) {
-                // std::cout << "destname:" <<destname << '\n';
-                strncpy(dir[i].file_name, destname.c_str(), sizeof(destname));
-                this->disk.write(current_dir_block, (uint8_t*)dir);
-                delete[] dir;
+                // get info about entry
+                memcpy(entry_handler, &dir[i], sizeof(dir_entry));
+                // see if only change its name
+                if (destdir_bool != 0) {
+                    strncpy(dir[i].file_name, destname.c_str(), sizeof(destname));
+                    this->disk.write(current_dir_block, (uint8_t*)dir);
+                    delete[] dir, destdir; delete entry_handler;
+                    return 0;
+                } else {
+                    this->rm(sourcepath); // ok first remove
+                    break;
+                }
+            } else {
+                std::cerr << "Cannot move directory." << '\n';
+                delete[] dir, destdir;
+                return -1;
+            }
+        }
+    }
+    // then add to new dest dir
+    if (destdir_bool == 0) {
+        if (check_if_dir_full(dir_block)) {
+            delete[] dir, destdir; delete entry_handler;
+            std::cerr << "Destination directory is full." << '\n';
+            return -1;
+        }
+        for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
+            if (destdir[i].size == 0) {
+                memcpy(&destdir[i], entry_handler, sizeof(dir_entry));
+                this->disk.write(dir_block, (uint8_t*)destdir);
+                delete[] dir, destdir; delete entry_handler;
                 return 0;
             }
-            if (dir[i].type == TYPE_DIR) {
-                // här fixa:
-                // dir_block = get_block_of_dir();
-                // dir_entry* new_file = new dir_entry;
-                // uint8_t* tmp = new uint8_t[BLOCK_SIZE];
-                // debug = this->disk.read(dir_block, tmp);
-                // int16_t* fat = (int16_t*)tmp;
-                // if (FS::save_entry_on_disk(data, fat, new_file) != 0) {
-                //     delete[] fat; delete new_file;
-                //     return -1;
-                // }
-                // delete[] fat;
-                // std::cout << "shalom!" << '\n';
-            }
-            return -1;
         }
     }
     return 0;
@@ -879,11 +940,12 @@ std::vector<int>FS::get_dir_blocks(std::string dirpath) {
             return dir_blocks;
         }
     }
+    int tmp_dir_block = current_dir_block;
     if (dirpath.rfind(delimiter, 0) == 0) {
         // absolute path
         dir_blocks.push_back(ROOT_BLOCK);
         current_working_dir = "/";
-        current_dir_block = ROOT_BLOCK;
+        tmp_dir_block = ROOT_BLOCK;
         if (dirpath.size() == 1) {
             delete[] dir;
             return dir_blocks;
@@ -898,7 +960,7 @@ std::vector<int>FS::get_dir_blocks(std::string dirpath) {
     int done = -1;
     std::string token = "";
     int index = 0;
-    int tmp_dir_block = current_dir_block;
+    // int tmp_dir_block = current_dir_block;
     while (done == -1) {
         // get token and shorten dirpath
         token = dirpath.substr(0, dirpath.find(delimiter));
