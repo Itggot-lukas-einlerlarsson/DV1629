@@ -50,6 +50,7 @@ private:
     std::string get_filename(std::string filepath);
     std::string privilege_to_string(uint8_t privilege);
     std::vector<int> get_dir_blocks(std::string dirpath);
+    int check_if_dir_full(int dir_block);
 
 public:
     // precreated

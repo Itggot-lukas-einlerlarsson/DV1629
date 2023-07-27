@@ -42,11 +42,17 @@
 // mkdir måste kolla om fil redan finns..
 // pwd verkar inte fungera korrekt om man går tbx till root dir
 // behöver fixa privilegium kontroller..
+// varför måste en fil vara minst 16 bitar?
+// TASK 1:
+// varför måste en fil vara minst 16 bitar?
+// TASK 2:
+// Khorosho
+// TASK 3:
+//
 
 
 FS::FS()
 {
-    std::cout << "FS::FS()... Creating file system\n";
     // ' lägg in att current dir =/ och current block är ROOT_BLOCK
     current_dir_block = ROOT_BLOCK;
     current_working_dir = "/";
@@ -79,9 +85,9 @@ FS::format()
     fat[0] = FAT_EOF; fat[1] = FAT_EOF; // first two blocks are occupied
     for (size_t i = 2; i < BLOCK_SIZE/2; i++) {
         fat[i] = FAT_FREE;
-        std::cout << fat[i] << ' ';
+        // std::cout << fat[i] << ' ';
     }
-    std::cout << '\n';
+    // std::cout << '\n';
     this->disk.write(FAT_BLOCK, (uint8_t*)fat);
     this->current_working_dir = "/";
     delete[] fat;
@@ -110,8 +116,8 @@ std::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, st
         data += line + "\n";
         std::getline(std::cin, line); // cin max is 4096 kek
     }
-    std::cout << "sizeo: " <<  data.size() << '\n';
-    std::cout << "max sizeo: " << data.max_size() << '\n';
+    // std::cout << "sizeo: " <<  data.size() << '\n';
+    // std::cout << "max sizeo: " << data.max_size() << '\n';
     if (data.size() == 0) { // EV annars ta bort filen om den är för liten.
         data.resize(data.size()+1, *" "); // size of file needs to be larger than 1.
     }
@@ -120,7 +126,7 @@ std::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, st
 }
 
 int FS::check_if_file_in_CWD(dir_entry* current_working_dir, int file_type, const char file_name[56]){
-    for (size_t i = 0; i < 64; i++) {
+    for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         if (strcmp(current_working_dir[i].file_name, file_name) == 0) {
             if (file_type == TYPE_FILE) {
                 // std::cerr << "There already exist a file with that name!" << '\n';
@@ -154,15 +160,15 @@ int FS::save_entry_on_disk(std::string data, int16_t* fat, dir_entry* new_file){
             return -1;
         }
     }
-    for (size_t i = 0; i < free_blocks.size(); i++) {
-        std::cout << "freeblocks: " << free_blocks[i] << '\n';
-    }
+    // for (size_t i = 0; i < free_blocks.size(); i++) {
+    //     std::cout << "freeblocks: " << free_blocks[i] << '\n';
+    // }
     new_file->first_blk = free_blocks[0];
     int writing_block_size = BLOCK_SIZE-1; //-1
     std::string data_part;
     if (free_blocks.size() == 1) {
         fat[free_blocks[0]] = FAT_EOF;
-        std::cout << "WRITING: in block " << free_blocks[0] << ":\n"<< data << '\n';
+        // std::cout << "WRITING: in block " << free_blocks[0] << ":\n"<< data << '\n';
         this->disk.write(free_blocks[0], (uint8_t*)(char*)data.c_str()); //
     } else {
         int i = 0;
@@ -170,13 +176,13 @@ int FS::save_entry_on_disk(std::string data, int16_t* fat, dir_entry* new_file){
             if (i+1 < free_blocks.size()) {
                 fat[free_blocks[i]] = free_blocks[i+1];
                 data_part = data.substr(i*writing_block_size, (i+1)*writing_block_size); // här ligger felet!
-                std::cout << "SIZEO:" << data_part.size() << '\n'; // här ligger felet!
-                std::cout << "WRITING: in block " << free_blocks[i] << "\n"<< data_part << '\n';
+                // std::cout << "SIZEO:" << data_part.size() << '\n'; // här ligger felet!
+                // std::cout << "WRITING: in block " << free_blocks[i] << "\n"<< data_part << '\n';
                 this->disk.write(free_blocks[i], (uint8_t*)(char*)data_part.c_str());
                 i++;
             } else {
                 data_part = data.substr(i*writing_block_size, (i+1)*writing_block_size);
-                std::cout << "WRITING: in block " << free_blocks[i] << ":\n"<< data_part << '\n';
+                // std::cout << "WRITING: in block " << free_blocks[i] << ":\n"<< data_part << '\n';
                 this->disk.write(free_blocks[i], (uint8_t*)(char*)data_part.c_str());
                 fat[free_blocks[i]] = FAT_EOF;
                 break;
@@ -188,18 +194,36 @@ int FS::save_entry_on_disk(std::string data, int16_t* fat, dir_entry* new_file){
 }
 
 int FS::save_entry_on_CWD(int current_dir_block, dir_entry* current_working_dir, dir_entry* new_file){
-    for (size_t i = 0; i < 64; i++) {
+    for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         if (current_working_dir[i].size == 0) {
             memcpy(&current_working_dir[i], new_file, sizeof(dir_entry));
             break;
         }
     }
-    for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
-        std::cout << current_working_dir[i].first_blk << ' ';
-    } std::cout << '\n';
+    // for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
+    //     std::cout << current_working_dir[i].first_blk << ' ';
+    // } std::cout << '\n';
     this->disk.write(current_dir_block, (uint8_t*)current_working_dir);
     return 0;
 }
+
+int FS::check_if_dir_full(int dir_block){
+    dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
+    int debug = this->disk.read(dir_block, (uint8_t*)dir);
+    int count = 0;
+    int index = 0;
+    while (index < BLOCK_SIZE/DIR_ENTRY_SIZE) {
+        if (dir[index].size != 0) {
+            count++;
+        }
+        index++;
+    }
+    if (count == 64) {
+        return -1;
+    }
+    return 0;
+}
+
 
 // create <filepath> creates a new file on the disk, the data content is
 // written on the following rows (ended with an empty row)
@@ -209,12 +233,17 @@ FS::create(std::string filepath)
     // gather info about dir entry
     dir_entry* new_file = new dir_entry;
     std::string filename = get_filename(filepath);
+
+    // check errors:
     if (filename.size() > 55) {
         std::cerr << "Filename is too long (>55 characters)" << '\n';
         delete new_file;
         return -1;
     }
-    // filename = this->current_working_dir + filename;
+    if (this->check_if_dir_full(current_dir_block) == -1) {
+        std::cerr << "Directory is full!" << '\n';
+        return -1;
+    }
     std::string data = this->gather_info_new_dir_entry(TYPE_FILE, new_file, filename);
 
     // see if in CWD, if not -> ok write.
@@ -267,10 +296,10 @@ FS::cat(std::string filepath)
     int index_block;
     int file_found = -1;
     int file_size;
-    for (size_t i = 0; i < 64; i++) {
+    for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         if (dir[i].file_name == filename) {
             if (dir[i].type == TYPE_DIR) {
-                std::cout << "File is a directory." << '\n';
+                std::cerr << "File is a directory." << '\n';
                 delete[] dir;
                 return -1;
             }
@@ -282,7 +311,7 @@ FS::cat(std::string filepath)
     }
     if (file_found != 0) {
         delete[] dir;
-        std::cout << "file not found." << '\n';
+        std::cerr << "File not found." << '\n';
         return -1;
     }
     delete[] dir;
@@ -296,9 +325,10 @@ FS::cat(std::string filepath)
     int count = 0;
     do {
         debug = this->disk.read(index_block, block);
-        std::cout << "index block " << index_block << ":\n";
+        // std::cout << "index block " << index_block << ":\n";
         std::string file_data = (char*)block;
-        std::cout << file_data.size() << "\t:" << file_data << '\n';
+        std::cout << file_data;
+        // std::cout << file_data.size() << "\t:" << file_data << '\n';
         // std::cout << file_data.substr(0, std::min(file_size - BLOCK_SIZE*count, BLOCK_SIZE));
         // std::cout << file_data.substr(count*BLOCK_SIZE, (count+1)*BLOCK_SIZE) << '\n';
         index_block = fat[index_block];
@@ -327,24 +357,26 @@ std::string FS::privilege_to_string(uint8_t privilege) {
     }
     return "---"; // 000
 }
+
 // ls lists the content in the currect directory (files and sub-directories)
 int
 FS::ls()
 {
     dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
     int debug = this->disk.read(current_dir_block, (uint8_t*)dir);
-    std::cout << "name\t\t\t\ttype\t\t\tsize\t\t\tfirst_blk\t\t\taccessrights" << '\n';
-    for (size_t i = 0; i < 64; i++) {
+    std::cout << "name \ttype\tsize\taccessrights" << '\n';
+    // std::cout << "name\t\t\t\ttype\t\t\tsize\t\t\tfirst_blk\t\t\taccessrights" << '\n';
+    for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         if (dir[i].size != 0) {
-            std::cout << dir[i].file_name << "\t\t\t";
+            std::cout << dir[i].file_name << "\t";
             if (dir[i].type == TYPE_FILE) {
-                std::cout << "file" << "\t\t\t";
-                std::cout << dir[i].size << "\t\t\t";
+                std::cout << "file" << "\t";
+                std::cout << dir[i].size << "\t";
             } else {
-                std::cout << "dir" << "\t\t\t";
-                std::cout << "-" << "\t\t\t";
+                std::cout << "dir" << "\t";
+                std::cout << "-" << "\t";
             }
-            std::cout << dir[i].first_blk << "\t\t\t";
+            // std::cout << dir[i].first_blk << "\t\t\t";
             std::cout << privilege_to_string(dir[i].access_rights) << "\n";
             // std::cout << root_dir[i].file_name << '\t' << root_dir[i].size << '\t' << root_dir[i].first_blk << '\t' << root_dir[i].type << '\t' << root_dir[i].access_rights << '\n';
         }
@@ -358,7 +390,7 @@ std::string FS::gather_info_old_dir_entry(dir_entry* current_working_dir, dir_en
     int index_block;
     int file_size;
     int debug;
-    for (size_t i = 0; i < 64; i++) {
+    for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         if (current_working_dir[i].file_name == filename) {
             index_block = current_working_dir[i].first_blk;
             file_size = current_working_dir[i].size; //EV
@@ -377,7 +409,7 @@ std::string FS::gather_info_old_dir_entry(dir_entry* current_working_dir, dir_en
     int count = 0;
     do {
         debug = this->disk.read(index_block, block);
-        std::cout << "index block " << index_block << ":\n";
+        // std::cout << "index block " << index_block << ":\n";
         file_data += (char*)block;
         index_block = fat[index_block];
         count++;
@@ -401,6 +433,10 @@ FS::cp(std::string sourcepath, std::string destpath)
         delete new_file;
         return -1;
     }
+    if (this->check_if_dir_full(current_dir_block) == -1) {
+        std::cerr << "Directory is full!" << '\n';
+        return -1;
+    }
     strncpy(new_file->file_name, destname.c_str(), sizeof(destname));
     new_file->type = TYPE_FILE;
     // see if source in CWD, if not -> bad write.
@@ -409,7 +445,7 @@ FS::cp(std::string sourcepath, std::string destpath)
     // här behövs först kollas om source finns.
     if (check_if_file_in_CWD(dir, TYPE_FILE, sourcename.c_str()) == 0) {
         delete[] dir; delete new_file;
-        std::cout << "that sourcefile doesnt exist!" << '\n';
+        std::cerr << "that sourcefile doesnt exist!" << '\n';
         return -1;
     }
     // see if dest in CWD, if not -> ok write.
@@ -447,37 +483,42 @@ FS::mv(std::string sourcepath, std::string destpath)
 {
     std::string sourcename = get_filename(sourcepath);
     std::string destname = get_filename(destpath);
+    // error checking
     if (sourcename.size() > 55 || destname.size() > 55) {
         std::cerr << "Filename of destination/source file is too long (>55 characters)" << '\n';
         return -1;
     }
-
+    if (this->check_if_dir_full(current_dir_block) == -1) {
+        std::cerr << "Directory is full!" << '\n';
+        return -1;
+    }
     //check if it exists in dir
     dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
     int debug = this->disk.read(current_dir_block, (uint8_t*)dir);
     // här behövs först kollas om source finns.
     if (check_if_file_in_CWD(dir, TYPE_FILE, sourcename.c_str()) == 0) {
         delete[] dir;
-        std::cout << "that sourcefile doesnt exist!" << '\n';
+        std::cerr << "that sourcefile doesnt exist!" << '\n';
         return -1;
     }
     // see if dest in CWD, if not -> ok write.
     if (check_if_file_in_CWD(dir, TYPE_FILE, destname.c_str()) != 0) {
         delete[] dir;
-        std::cout << "that destfile already exist!" << '\n';
+        std::cerr << "that destfile already exist!" << '\n';
         return -1;
     }
-    for (size_t i = 0; i < 64; i++) {
+    for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         // std::cout << current_working_dir[i].file_name << "\t" << new_file->file_name << '\n';
         if (strcmp(dir[i].file_name, sourcename.c_str()) == 0) {
             if (dir[i].type == TYPE_FILE) {
-                std::cout << "destname:" <<destname << '\n';
+                // std::cout << "destname:" <<destname << '\n';
                 strncpy(dir[i].file_name, destname.c_str(), sizeof(destname));
                 this->disk.write(current_dir_block, (uint8_t*)dir);
                 delete[] dir;
                 return 0;
             }
             if (dir[i].type == TYPE_DIR) {
+                // här fixa:
                 // dir_block = get_block_of_dir();
                 // dir_entry* new_file = new dir_entry;
                 // uint8_t* tmp = new uint8_t[BLOCK_SIZE];
@@ -488,7 +529,7 @@ FS::mv(std::string sourcepath, std::string destpath)
                 //     return -1;
                 // }
                 // delete[] fat;
-                std::cout << "shalom!" << '\n';
+                // std::cout << "shalom!" << '\n';
             }
             return -1;
         }
@@ -505,13 +546,15 @@ FS::rm(std::string filepath)
         std::cerr << "Filename is too long (>55 characters)" << '\n';
         return -1;
     }
-    // see if in CWD, if not -> ok write.
     dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
     int debug = this->disk.read(current_dir_block, (uint8_t*)dir);
+    // see if in dir, if not -> error.
     // check if file already exists
-    for (size_t i = 0; i < 64; i++) {
+    int found = -1;
+    for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         // std::cout << current_working_dir[i].file_name << "\t" << new_file->file_name << '\n';
         if (strcmp(dir[i].file_name, filename.c_str()) == 0) {
+            found = 0;
             if (dir[i].type == TYPE_FILE) {
                 int index_block;
                 index_block = dir[i].first_blk;
@@ -545,6 +588,9 @@ FS::rm(std::string filepath)
             }
         }
     }
+    if (found == -1) {
+        std::cerr << "File not found." << '\n';
+    }
     return 0;
 }
 
@@ -568,12 +614,12 @@ FS::append(std::string filepath1, std::string filepath2)
     // här behövs först kollas om source finns.
     if (check_if_file_in_CWD(dir, TYPE_FILE, sourcename.c_str()) == 0) {
         delete[] dir;
-        std::cout << "that sourcefile doesnt exist!" << '\n';
+        std::cerr << "that sourcefile doesnt exist!" << '\n';
         return -1;
     }
     if (check_if_file_in_CWD(dir, TYPE_FILE, destname.c_str()) == 0) {
         delete[] dir;
-        std::cout << "that destfile doesnt exist!" << '\n';
+        std::cerr << "that destfile doesnt exist!" << '\n';
         return -1;
     }
 
@@ -587,7 +633,7 @@ FS::append(std::string filepath1, std::string filepath2)
     debug = this->disk.read(FAT_BLOCK, tmp);
     int16_t* fat = (int16_t*)tmp;
 
-    for (size_t i = 0; i < 64; i++) {
+    for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         if (strcmp(dir[i].file_name, destname.c_str()) == 0) {
             if (dir[i].type == TYPE_FILE) {
                 dir[i].size += data_size;
@@ -607,9 +653,9 @@ FS::append(std::string filepath1, std::string filepath2)
                 //     index_block = tmp_block;
                 // }
                 break;
-            }
+            } // EV else här ist.
             if (dir[i].type == TYPE_DIR) {
-                std::cout << "Dest file is a directory!" << '\n';
+                std::cerr << "Destination file is a directory!" << '\n';
                 delete[] dir; delete entry_handler;
                 return -1;
             }
@@ -617,7 +663,7 @@ FS::append(std::string filepath1, std::string filepath2)
     }
 
     // save entry on disk
-    std::cout << "DATA: " << data << '\n';
+    // std::cout << "DATA: " << data << '\n';
     if (FS::save_entry_on_disk(data, fat, entry_handler) != 0) {
         delete[] fat; delete entry_handler; delete[] dir;
         return -1;
@@ -645,9 +691,21 @@ FS::mkdir(std::string dirpath)
         std::cerr << "Filename is too long (>55 characters)" << '\n';
         return -1;
     }
+    if (this->check_if_dir_full(current_dir_block) == -1) {
+        std::cerr << "Directory is full!" << '\n';
+        return -1;
+    }
+    int debug;
+    dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
+    debug = this->disk.read(current_dir_block, (uint8_t*)dir);
+    if (check_if_file_in_CWD(dir, TYPE_FILE, filename.c_str()) != 0) {
+        delete[] dir;
+        std::cerr << "That file already exist!" << '\n';
+        return -1;
+    }
+
 
     // if absolute path -> here needs to attain correct filename and root block.
-    int debug;
     uint8_t* tmp = new uint8_t[BLOCK_SIZE]; // behlöver deleteas. memory leaks.
     debug = this->disk.read(FAT_BLOCK, tmp);
     int16_t* fat = (int16_t*)tmp;
@@ -659,6 +717,7 @@ FS::mkdir(std::string dirpath)
         }
         if (i == (BLOCK_SIZE/2-1)) {
             std::cerr << "DISK is FULL!" << '\n';
+            delete[] fat, dir;
             return -1;
         }
     }
@@ -678,8 +737,8 @@ FS::mkdir(std::string dirpath)
         new_dir[i].access_rights = READ + WRITE + EXECUTE;
     }
 
-    dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
-    debug = this->disk.read(current_dir_block, (uint8_t*)dir);
+    // dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
+    // debug = this->disk.read(current_dir_block, (uint8_t*)dir);
 
     dir_entry* new_file = new dir_entry;
     strncpy(new_file->file_name, filename.c_str(), sizeof(filename));
@@ -736,7 +795,7 @@ FS::mkdir(std::string dirpath)
 //         uint8_t* blk = new uint8_t[4096];
 //         disk.read(current_dir_blk, blk);
 //         dir_entry* dir_entries = (dir_entry*)blk;
-        // for(int i = 0; i < 64; i++) {
+        // for(int i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         //     if(dir_entries[i].file_name == path) {
         //         current_dir_blk = dir_entries[i].first_blk;
         //     }
@@ -756,15 +815,13 @@ std::vector<int>FS::get_dir_blocks(std::string dirpath) {
     int debug = this->disk.read(current_dir_block, (uint8_t*)dir);
     if (dirpath.find(delimiter)==std::string::npos) {
         // if (no) absolute path or relative path
-        std::cout << "HELLO!" << '\n';
-        for(int i = 0; i < 64; i++) {
+        for(int i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
             if(dir[i].file_name == dirpath && dir[i].type == TYPE_DIR) {
                 dir_blocks.push_back(dir[i].first_blk);
                 found = 0;
             }
         }
         if (found == -1) {
-            std::cerr << "Directory not found" << '\n';
             delete[] dir;
             dir_blocks.push_back(-1);
             return dir_blocks;
@@ -772,7 +829,14 @@ std::vector<int>FS::get_dir_blocks(std::string dirpath) {
             if (current_working_dir == "/") {
                 current_working_dir += dirpath;
             } else {
-                current_working_dir += "/" + dirpath;
+                if (dirpath == "..") {
+                    current_working_dir = current_working_dir.substr(0, current_working_dir.find_last_of('/'));
+                    if (current_working_dir.empty()) {
+                        current_working_dir = "/";
+                    }
+                } else {
+                    current_working_dir += "/" + dirpath;
+                }
             }
             return dir_blocks;
         }
@@ -780,10 +844,10 @@ std::vector<int>FS::get_dir_blocks(std::string dirpath) {
     if (dirpath.rfind(delimiter, 0) == 0) {
         // absolute path
         dir_blocks.push_back(ROOT_BLOCK);
+        current_working_dir = "/";
         current_dir_block = ROOT_BLOCK;
         if (dirpath.size() == 1) {
             delete[] dir;
-            current_working_dir = "/";
             return dir_blocks;
         }
         dirpath = dirpath.substr(1, dirpath.size());
@@ -793,29 +857,29 @@ std::vector<int>FS::get_dir_blocks(std::string dirpath) {
     if (last_char != '/') {
         dirpath += delimiter;
     }
-    std::cout << "Dirpath: " << dirpath << '\n';
     int done = -1;
     std::string token = "";
     int index = 0;
     int tmp_dir_block = current_dir_block;
     while (done == -1) {
+        // get token and shorten dirpath
         token = dirpath.substr(0, dirpath.find(delimiter));
-        std::cout << "token: " << token << '\n';
-        current_working_dir += "/" + token;
         if (token.empty() == true || dirpath.empty() == true) {
-            done == 0;
-            break;
+            done = 0;
+            continue;
         } else {
             dirpath = dirpath.substr(dirpath.find(delimiter)+1, dirpath.size());
-            std::cout << "dirpath:" << dirpath << '\n';
         }
-        if (token == ".." && current_working_dir == "/") {
-            continue;
-        }
+        // if (token == "..") {
+        //     current_working_dir = current_working_dir.substr(0, current_working_dir.find_last_of('/')+1);
+        // } else {
+        //     current_working_dir += "/" + token;
+        // }
+        // gather new dir block
         dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
         debug = this->disk.read(tmp_dir_block, (uint8_t*)dir);
         found = -1;
-        for(int i = 0; i < 64; i++) {
+        for(int i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
             if(dir[i].file_name == token) {
                 dir_blocks.push_back(dir[i].first_blk);
                 tmp_dir_block = dir[i].first_blk;
@@ -823,10 +887,25 @@ std::vector<int>FS::get_dir_blocks(std::string dirpath) {
             }
         }
         delete[] dir;
+
+        // see if dir was found or not
         if (found == -1) {
-            std::cerr << "Directory was not found." << '\n';
             dir_blocks.push_back(-1);
             return dir_blocks;
+        }
+
+        // update current_working_dir
+        if (current_working_dir == "/") {
+            current_working_dir += token;
+        } else {
+            if (token == "..") {
+                current_working_dir = current_working_dir.substr(0, current_working_dir.find_last_of('/'));
+                if (current_working_dir.empty()) {
+                    current_working_dir = "/";
+                }
+            } else {
+                current_working_dir += "/" + token;
+            }
         }
     }
     // current_dir_block = 0;
@@ -838,10 +917,12 @@ std::vector<int>FS::get_dir_blocks(std::string dirpath) {
 int
 FS::cd(std::string dirpath)
 {
+    std::string original_path = current_working_dir;
     std::vector<int> blocks = get_dir_blocks(dirpath);
     for (size_t i = 0; i < blocks.size(); i++) {
-        std::cout << blocks[i] << '\n';
         if (blocks[i] == -1) {
+            std::cerr << "Directory was not found" << '\n';
+            current_working_dir = original_path;
             return -1;
         }
     }
@@ -946,7 +1027,7 @@ FS::chmod(std::string accessrights, std::string filepath)
         }
     }
     if (std::stoi(accessrights) > 8 || std::stoi(accessrights) < 0) {
-        std::cout << "accessrights not implementable" << '\n';
+        std::cerr << "accessrights not implementable" << '\n';
         return -1;
     }
     //check if it exists in dir
@@ -955,12 +1036,12 @@ FS::chmod(std::string accessrights, std::string filepath)
     // här behövs först kollas om source finns.
     if (check_if_file_in_CWD(dir, TYPE_FILE, filename.c_str()) == 0) {
         delete[] dir;
-        std::cout << "that file doesnt exist!" << '\n';
+        std::cerr << "that file doesnt exist!" << '\n';
         return -1;
     }
 
     // see if dest in CWD, if not -> ok write.
-    for (size_t i = 0; i < 64; i++) {
+    for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         // std::cout << current_working_dir[i].file_name << "\t" << new_file->file_name << '\n';
         if (strcmp(dir[i].file_name, filename.c_str()) == 0) {
             // doesnt matter dir/file
