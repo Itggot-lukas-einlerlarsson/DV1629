@@ -855,56 +855,6 @@ FS::mkdir(std::string dirpath)
     return 0;
 }
 
-// int FS::get_dir_block(std::string dirpath) {
-//     // Om startar med / så ska den vara absolut
-//     // Om den inte startar med / så ska man ta pathen som går från current_path + dir_path
-//     std::string wanted_path;
-//     int current_dir_blk = 0;
-//
-//     if(dirpath.find_first_of('/') == 0) {
-//         wanted_path = dirpath;
-//     } else if(dirpath == "..") {
-//         if(current_working_dir.length() > 1){
-//             wanted_path = current_working_dir.substr(0, current_working_dir.length()-2);
-//             wanted_path = wanted_path.substr(0, wanted_path.find_last_of("/"));
-//         }
-//     }
-//      else if(dirpath.find("../") != std::string::npos || dirpath.find("..") != std::string::npos) {
-//         wanted_path = current_working_dir + '/' +dirpath;
-//         // std::cout << "Original wanted path: " << wanted_path << std::endl;
-//         int i = 2;
-//         while(wanted_path.find("../") != std::string::npos || wanted_path.find("..") != std::string::npos) {
-//             wanted_path = wanted_path.substr(0, wanted_path.find("../")-1);
-//             wanted_path = wanted_path.substr(0, wanted_path.find_last_of('/'));
-//             if(wanted_path.empty()) break;
-//             wanted_path += dirpath.substr(dirpath.find("../")+2, dirpath.size());
-//         }
-//     } else {
-//         wanted_path = current_working_dir + '/' + dirpath;
-//     }
-//
-//     // std::cout << "Result Wanted path: " << wanted_path << std::endl;
-//
-//     std::stringstream ss(wanted_path);
-//     std::string path;
-//     while (!ss.eof()) {
-//         std::getline(ss, path, '/');
-//         // std::cout << "" << path << std::endl;
-//
-//         uint8_t* blk = new uint8_t[4096];
-//         disk.read(current_dir_blk, blk);
-//         dir_entry* dir_entries = (dir_entry*)blk;
-        // for(int i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
-        //     if(dir_entries[i].file_name == path) {
-        //         current_dir_blk = dir_entries[i].first_blk;
-        //     }
-        // }
-//         delete[] blk;
-//     }
-//     return current_dir_blk;
-// }
-
-
 std::vector<int>FS::get_dir_blocks(std::string dirpath) {
     std::string delimiter = "/";
     std::vector<int> dir_blocks;
@@ -970,11 +920,7 @@ std::vector<int>FS::get_dir_blocks(std::string dirpath) {
         } else {
             dirpath = dirpath.substr(dirpath.find(delimiter)+1, dirpath.size());
         }
-        // if (token == "..") {
-        //     current_working_dir = current_working_dir.substr(0, current_working_dir.find_last_of('/')+1);
-        // } else {
-        //     current_working_dir += "/" + token;
-        // }
+
         // gather new dir block
         dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
         debug = this->disk.read(tmp_dir_block, (uint8_t*)dir);
@@ -1031,75 +977,6 @@ FS::cd(std::string dirpath)
     }
     return 0;
 }
-//
-// int
-// FS::cd(std::string dirpath)
-// {
-//     std::string root_dir_str = "/";
-//     std::string previous_dir_str = "..";
-//     std::string filename = get_filename(dirpath);
-//     if (strcmp(dirpath.c_str(), root_dir_str.c_str()) == 0) {
-//         current_working_dir = "/";
-//         current_dir_block = ROOT_BLOCK;
-//         return 0;
-//     }
-//     dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
-//     int debug = this->disk.read(current_dir_block, (uint8_t*)dir);
-//     dir_entry* entry_handler = new dir_entry;
-//     if (strcmp(dirpath.c_str(), previous_dir_str.c_str()) == 0) {
-//         std::cout << dirpath << '\n';
-//         std::cout << current_dir_block << '\n';
-//         if (current_working_dir.find_last_of('/') > 0) {
-//             current_working_dir = current_working_dir.substr(0, current_working_dir.find_last_of('/'));
-//         } else {
-//             current_working_dir = "/";
-//         }
-//         for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
-//             if (strcmp(dir[i].file_name, previous_dir_str.c_str()) == 0) {
-//                 memcpy(entry_handler, &dir[i], sizeof(dir_entry));
-//                 current_dir_block = entry_handler->first_blk;
-//                 delete[] dir; delete entry_handler;
-//                 return 0;
-//             }
-//         }
-//     } else {
-//         int prev_dir_block = current_dir_block;
-//         int tmp_dir_block = get_dir_block(dirpath);
-//         if (tmp_dir_block == -1) {
-//             std::cerr << "The directory was not found." << '\n';
-//             delete[] dir; delete entry_handler;
-//             return -1;
-//         }
-//         current_dir_block = tmp_dir_block;
-//         debug = this->disk.read(current_dir_block, (uint8_t*)dir);
-//         if (prev_dir_block == current_dir_block) {
-//             ;
-//         } else {
-//             if (dirpath.rfind("/", 0) == 0) {
-//                 current_working_dir = dirpath;
-//             } else {
-//                 if (strcmp(dirpath.c_str(), root_dir_str.c_str()) == 0) {
-//                     current_working_dir = current_working_dir + dirpath;
-//                 } else {
-//                     current_working_dir = current_working_dir + '/' + dirpath;
-//                 }
-//             }
-//         }
-//         for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
-//             if (strcmp(dir[i].file_name, filename.c_str()) == 0) {
-//                 memcpy(entry_handler, &dir[i], sizeof(dir_entry));
-//                 current_dir_block = entry_handler->first_blk;
-//                 delete[] dir; delete entry_handler;
-//                 return 0;
-//             }
-//         }
-//     }
-//     // this->rm(destname);
-//     // this->create(destname);
-//     // see if source in CWD, if not -> bad write.
-//     // här behövs först kollas om source finns.
-//     return 0;
-// }
 
 // pwd prints the full path, i.e., from the root directory, to the current
 // directory, including the currect directory name
