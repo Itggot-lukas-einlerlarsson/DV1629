@@ -54,6 +54,10 @@
 // task 4:
 // man kan mv en fil a till root även om a redan finns i root
 
+// alles klar med testerna, ska fixa paths för rm, append, cat, chmod
+// det finns en sak med testerna i test1. sizen är fel! debugga. ev måste size vara minst 16.
+// EV: så om size < 16 -> size = 16.
+
 
 FS::FS()
 {
@@ -299,6 +303,11 @@ FS::cat(std::string filepath)
                 std::cerr << "File is a directory." << '\n';
                 delete[] dir;
                 return -1;
+            }
+            if (privilege_check(dir[i].access_rights, READ) != 0) {
+                std::cerr << "You dont have the permission to read this file." << '\n';
+                delete[] dir;
+                return -2;
             }
             index_block = dir[i].first_blk;
             file_size = dir[i].size;
@@ -729,6 +738,11 @@ FS::append(std::string filepath1, std::string filepath2)
     std::string data = this->gather_info_old_dir_entry(dir, entry_handler, destname);
     data += this->gather_info_old_dir_entry(dir, entry_handler, sourcename);
     int data_size = entry_handler->size;
+    if (privilege_check(entry_handler->access_rights, READ) != 0) {
+        std::cerr << "You dont have the permission to read this file." << '\n';
+        delete[] dir; delete entry_handler;
+        return -2;
+    }
     // int index_block;
 
     uint8_t* tmp = new uint8_t[BLOCK_SIZE]; // behlöver deleteas. memory leaks.
@@ -737,6 +751,11 @@ FS::append(std::string filepath1, std::string filepath2)
 
     for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         if (strcmp(dir[i].file_name, destname.c_str()) == 0) {
+            if (privilege_check(dir[i].access_rights, WRITE) != 0) {
+                std::cerr << "You dont have the permission to write to this file." << '\n';
+                delete[] dir; delete entry_handler;
+                return -2;
+            }
             if (dir[i].type == TYPE_FILE) {
                 dir[i].size += data_size;
                 memcpy(entry_handler, &dir[i], sizeof(dir_entry));
@@ -748,12 +767,6 @@ FS::append(std::string filepath1, std::string filepath2)
                     index_block = tmp_block;
                 }
                 fat[entry_handler->first_blk] = FAT_FREE;
-                // index_block = entry_handler->first_blk;
-                // int tmp_block;
-                // while (index_block != FAT_EOF) {
-                //     tmp_block = fat[index_block];
-                //     index_block = tmp_block;
-                // }
                 break;
             } // EV else här ist.
             if (dir[i].type == TYPE_DIR) {
@@ -1026,6 +1039,13 @@ FS::pwd()
 {
     std::cout << this->current_working_dir << '\n';
     return 0;
+}
+
+int FS::privilege_check(uint8_t access_rights, uint8_t required_privilege) {
+    if ((access_rights & required_privilege) == required_privilege) {
+        return 0;
+    }
+	return -1;
 }
 
 // chmod <accessrights> <filepath> changes the access rights for the
