@@ -259,8 +259,14 @@ FS::create(std::string filepath)
     }
     delete[] fat;
 
-    //add to CWD
-    debug = FS::save_entry_on_CWD(current_dir_block, dir, new_file);
+    //add to CWD or dir
+    if (destdir_bool == 0) {
+        std::cerr << "Use mkdir to create a directory." << '\n';
+        delete new_file; delete[] dir;
+        return -1;
+    } else {
+        debug = FS::save_entry_on_CWD(current_dir_block, dir, new_file);
+    }
     delete new_file; delete[] dir;
     return 0;
 }
@@ -475,9 +481,7 @@ FS::cp(std::string sourcepath, std::string destpath)
                 return -1;
             }
         }
-        if (blocks[blocks.size()-1] != -1 || blocks.empty() == false) {
-            dir_block = blocks[blocks.size()-1];
-        }
+        dir_block = blocks[blocks.size()-1];
         if (this->check_if_dir_full(dir_block) == -1) {
             std::cerr << "Directory is full!" << '\n';
             return -1;
@@ -570,9 +574,7 @@ FS::mv(std::string sourcepath, std::string destpath)
                 return -1;
             }
         }
-        if (blocks[blocks.size()-1] != -1 || blocks.empty() == false) {
-            dir_block = blocks[blocks.size()-1];
-        }
+        dir_block = blocks[blocks.size()-1];
         // see if file already in dest directory
         debug = this->disk.read(dir_block, (uint8_t*)destdir);
         if (check_if_file_in_CWD(destdir, TYPE_FILE, destname.c_str()) != 0) {
@@ -967,9 +969,7 @@ FS::cd(std::string dirpath)
             return -1;
         }
     }
-    if (blocks[blocks.size()-1] != -1 || blocks.empty() == false) {
-        current_dir_block = blocks[blocks.size()-1];
-    }
+    current_dir_block = blocks[blocks.size()-1];
     return 0;
 }
 
