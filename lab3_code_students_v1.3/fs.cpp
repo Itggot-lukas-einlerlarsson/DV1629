@@ -278,25 +278,41 @@ FS::create(std::string filepath)
 int
 FS::cat(std::string filepath)
 {
-    dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
-    int debug = this->disk.read(current_dir_block, (uint8_t*)dir);
     // gather input info
-    std::string filename;
-    if (filepath.at(0) == '/') {
-        filename = filepath.substr(filepath.find_last_of("/") + 1);
-    } else {
-        filename = filepath;
-    }
+    std::string filename = get_filename(filepath);
     if (filename.size() > 55) {
         std::cerr << "Filename is too long and doesn't exist (>55 characters)." << '\n';
-        delete[] dir;
         return -1;
     }
+
+    dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
+    int debug = this->disk.read(current_dir_block, (uint8_t*)dir);
+
+    // see if destname is a dir
+    int dest_dir_bool = destination_dir_check(dir, filepath, filename);
+    int dir_block = current_dir_block;
 
     // see if file can be found and where its first block is
     int index_block;
     int file_found = -1;
     int file_size;
+
+    if (dest_dir_bool == 0) {
+        // dest is directory, get block
+        filepath = filepath.substr(0, filepath.rfind("/")+1);
+        std::string original_path = current_working_dir;
+        std::vector<int> blocks = get_dir_blocks(filepath);
+        current_working_dir = original_path;
+        for (size_t i = 0; i < blocks.size(); i++) {
+            if (blocks[i] == -1) {
+                std::cerr << "Directory was not found." << '\n';
+                delete[] dir;
+                return -1;
+            }
+        }
+        dir_block = blocks[blocks.size()-1];
+        debug = this->disk.read(dir_block, (uint8_t*)dir);
+    }
     for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         if (dir[i].file_name == filename) {
             if (dir[i].type == TYPE_DIR) {
@@ -331,12 +347,8 @@ FS::cat(std::string filepath)
     int count = 0;
     do {
         debug = this->disk.read(index_block, block);
-        // std::cout << "index block " << index_block << ":\n";
         std::string file_data = (char*)block;
         std::cout << file_data;
-        // std::cout << file_data.size() << "\t:" << file_data << '\n';
-        // std::cout << file_data.substr(0, std::min(file_size - BLOCK_SIZE*count, BLOCK_SIZE));
-        // std::cout << file_data.substr(count*BLOCK_SIZE, (count+1)*BLOCK_SIZE) << '\n';
         index_block = fat[index_block];
         count++;
     } while (index_block != FAT_EOF && index_block != FAT_FREE);
@@ -475,13 +487,11 @@ FS::cp(std::string sourcepath, std::string destpath)
     int dest_dir_bool = destination_dir_check(dir, destpath, destname);
     int dir_block = current_dir_block;
     if (dest_dir_bool == 0) {
-        strncpy(new_file->file_name, sourcename.c_str(), sizeof(sourcename));
         // dest is directory, get block
-        // int original_block = current_dir_block;
+        strncpy(new_file->file_name, sourcename.c_str(), sizeof(sourcename));
         std::string original_path = current_working_dir;
         std::vector<int> blocks = get_dir_blocks(destpath);
         current_working_dir = original_path;
-        // current_dir_block = original_block;
         for (size_t i = 0; i < blocks.size(); i++) {
             if (blocks[i] == -1) {
                 std::cerr << "Directory was not found." << '\n';
@@ -572,11 +582,9 @@ FS::mv(std::string sourcepath, std::string destpath)
     int dir_block = current_dir_block;
     if (dest_dir_bool == 0) {
         // dest is directory, get block
-        // int original_block = current_dir_block;
         std::string original_path = current_working_dir;
         std::vector<int> blocks = get_dir_blocks(destpath);
         current_working_dir = original_path;
-        // current_dir_block = original_block;
         for (size_t i = 0; i < blocks.size(); i++) {
             if (blocks[i] == -1) {
                 std::cerr << "Directory was not found." << '\n';
@@ -837,12 +845,10 @@ FS::mkdir(std::string dirpath)
     int dir_block = current_dir_block;
     if (dest_dir_bool == 0) {
         // dest is directory, get block
-        // int original_block = current_dir_block;
         dirpath = dirpath.substr(0, dirpath.rfind("/")+1);
         std::string original_path = current_working_dir;
         std::vector<int> blocks = get_dir_blocks(dirpath);
         current_working_dir = original_path;
-        // current_dir_block = original_block;
         for (size_t i = 0; i < blocks.size(); i++) {
             if (blocks[i] == -1) {
                 std::cerr << "Directory was not found." << '\n';
