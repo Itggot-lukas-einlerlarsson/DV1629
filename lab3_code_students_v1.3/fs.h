@@ -51,6 +51,8 @@ private:
     std::string privilege_to_string(uint8_t privilege);
     std::vector<int> get_dir_blocks(std::string dirpath);
     int check_if_dir_full(int dir_block);
+    int destination_dir_check(dir_entry* dir, std::string destpath, std::string destname);
+    
 
 public:
     // precreated
