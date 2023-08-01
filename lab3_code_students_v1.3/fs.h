@@ -37,9 +37,10 @@ private:
     Disk disk;
     // int16_t fat[BLOCK_SIZE/2];
 
-    //own:
-    int current_dir_block;
+    /* ----------   Help functions/private variables  ---------- */
+    // more info about each function in their declaration
     std::string current_working_dir;
+    int current_dir_block;
     std::string gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename);
     std::string gather_info_old_dir_entry(dir_entry* dir, dir_entry* new_file, std::string filename);
     int check_if_file_in_dir(dir_entry* dir, int file_type, const char file_name[56]);
