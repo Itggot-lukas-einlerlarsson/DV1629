@@ -189,7 +189,7 @@ FS::cat(std::string filepath)
                 return -1;
             }
             if (privilege_check(dir[i].access_rights, READ) != 0) {
-                std::cerr << "You dont have the permission to read this file." << '\n';
+                std::cerr << "You don't have the permission to read this file." << '\n';
                 delete[] dir;
                 return -2;
             }
@@ -288,7 +288,7 @@ FS::cp(std::string sourcepath, std::string destpath)
     int dir_block = current_dir_block;
     if (dest_dir_bool == 0) {
         // dest is directory, get the correct block
-        strncpy(new_file->file_name, sourcename.c_str(), sizeof(sourcename));
+        strncpy(new_file->file_name, sourcename.c_str(), sizeof(new_file->file_name));
         std::string original_path = current_working_dir;
         std::vector<int> blocks = get_dir_blocks(destpath);
         current_working_dir = original_path;
@@ -313,7 +313,7 @@ FS::cp(std::string sourcepath, std::string destpath)
             return -1;
         }
     } else {
-        strncpy(new_file->file_name, destname.c_str(), sizeof(destname));
+        strncpy(new_file->file_name, destname.c_str(), sizeof(new_file->file_name));
         if (this->check_if_dir_full(current_dir_block) == -1) {
             std::cerr << "Directory is full!" << '\n';
             delete[] dir, dest_dir; delete new_file;
@@ -421,7 +421,7 @@ FS::mv(std::string sourcepath, std::string destpath)
                 memcpy(entry_handler, &dir[i], sizeof(dir_entry));
                 // see if only change its name
                 if (dest_dir_bool != 0) {
-                    strncpy(dir[i].file_name, destname.c_str(), sizeof(destname));
+                    strncpy(dir[i].file_name, destname.c_str(), sizeof(dir[i].file_name));
                     this->disk.write(current_dir_block, (uint8_t*)dir);
                     delete[] dir, dest_dir; delete entry_handler;
                     return 0;
@@ -551,7 +551,7 @@ FS::append(std::string filepath1, std::string filepath2)
     data += this->gather_info_old_dir_entry(dir, entry_handler, sourcename);
     int data_size = entry_handler->size;
     if (privilege_check(entry_handler->access_rights, READ) != 0) {
-        std::cerr << "You dont have the permission to read this file." << '\n';
+        std::cerr << "You don't have the permission to read this file." << '\n';
         delete[] dir; delete entry_handler;
         return -2;
     }
@@ -563,7 +563,7 @@ FS::append(std::string filepath1, std::string filepath2)
     for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         if (strcmp(dir[i].file_name, destname.c_str()) == 0) {
             if (privilege_check(dir[i].access_rights, WRITE) != 0) {
-                std::cerr << "You dont have the permission to write to this file." << '\n';
+                std::cerr << "You don't have the permission to write to this file." << '\n';
                 delete[] dir, fat; delete entry_handler;
                 return -2;
             }
@@ -687,7 +687,7 @@ FS::mkdir(std::string dirpath)
     // create the new dir
     dir_entry* new_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
     std::string prev_dir_name = "..";
-    strncpy(new_dir[0].file_name, prev_dir_name.c_str(), sizeof(prev_dir_name));
+    strncpy(new_dir[0].file_name, prev_dir_name.c_str(), sizeof(new_dir[0].file_name));
     new_dir[0].size = 2;
     if (dest_dir_bool == 0) {
         new_dir[0].first_blk = dir_block; // previous block
@@ -705,7 +705,7 @@ FS::mkdir(std::string dirpath)
     }
 
     dir_entry* new_file = new dir_entry;
-    strncpy(new_file->file_name, filename.c_str(), sizeof(filename));
+    strncpy(new_file->file_name, filename.c_str(), sizeof(new_file->file_name));
     new_file->size = BLOCK_SIZE/DIR_ENTRY_SIZE;
     new_file->first_blk = free_block;
     new_file->type = TYPE_DIR;
@@ -811,7 +811,7 @@ std::string FS::get_filename(std::string filepath) {
 // This function gathers info about a new dir entry, used in the create() function.
 std::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename){
     // Start of new directory entry
-    strncpy(new_file->file_name, filename.c_str(), sizeof(filename));
+    strncpy(new_file->file_name, filename.c_str(), sizeof(new_file->file_name));
     new_file->access_rights = READ + WRITE + EXECUTE; // Access rights of a file or directory should be ’rw-’ or ’rwx’ when the file or directory is created. (7)
     new_file->type = file_type;
 
