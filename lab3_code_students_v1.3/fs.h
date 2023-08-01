@@ -35,20 +35,18 @@ struct dir_entry {
 class FS {
 private:
     Disk disk;
-    // size of a FAT entry is 2 bytes
     // int16_t fat[BLOCK_SIZE/2];
 
     //own:
     int current_dir_block;
-    std::string current_working_dir; //*** stack smashing detected ***: terminated av någon anledning.
-    // uint16_t* fat;
+    std::string current_working_dir;
     std::string gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename);
-    std::string gather_info_old_dir_entry(dir_entry* current_working_dir, dir_entry* new_file, std::string filename);
-    int check_if_file_in_CWD(dir_entry* current_working_dir, int file_type, const char file_name[56]);
+    std::string gather_info_old_dir_entry(dir_entry* dir, dir_entry* new_file, std::string filename);
+    int check_if_file_in_dir(dir_entry* dir, int file_type, const char file_name[56]);
     int save_entry_on_disk(std::string data, int16_t* fat, dir_entry* new_file);
-    int save_entry_on_CWD(int current_dir_block, dir_entry* current_working_dir, dir_entry* new_file);
+    int save_entry_in_dir(int current_dir_block, dir_entry* dir, dir_entry* new_file);
     std::string get_filename(std::string filepath);
-    std::string privilege_to_string(uint8_t privilege);
+    std::string privilege_string(uint8_t privilege);
     std::vector<int> get_dir_blocks(std::string dirpath);
     int check_if_dir_full(int dir_block);
     int destination_dir_check(dir_entry* dir, std::string destpath, std::string destname);
