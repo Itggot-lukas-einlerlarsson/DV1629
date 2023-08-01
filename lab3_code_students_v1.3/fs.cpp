@@ -56,8 +56,11 @@
 
 // alles klar med testerna, ska fixa paths för rm, append, cat, chmod
 // det finns en sak med testerna i test1. sizen är fel! debugga. ev måste size vara minst 16.
-// EV: så om size < 16 -> size = 16.
-// mv kan inte föra över större filer.
+// EV: så om size < 16 -> size = 16. klart
+// mv kan inte föra över större filer. klart
+// ls listar inte dirs först, försumbart?
+// from lab desc: Access rights of a file or directory should be ’rw-’ or ’rwx’ when the file or directory is created.
+
 
 // Constructor
 FS::FS()
@@ -89,7 +92,6 @@ FS::format()
     delete[] root_dir;
     // block nr 1 is File Allocation Table, set all blocks as free except first two blocks.
     int16_t* fat = new int16_t[BLOCK_SIZE/2]; // Whole FAT in one block, we can address 4096 / 2 = 2048 disk blocks in a partition
-    //disk write is not setup for BLOCK_SIZE/2
     fat[0] = FAT_EOF; fat[1] = FAT_EOF; // first two blocks are occupied
     for (size_t i = 2; i < BLOCK_SIZE/2; i++) {
         fat[i] = FAT_FREE;
@@ -125,7 +127,7 @@ std::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, st
     std::getline(std::cin, line);
     while(line != "") {
         data += line + "\n";
-        std::getline(std::cin, line); // cin max is 4096
+        std::getline(std::cin, line);
     }
     if (data.size() < 16) {
         data.resize(16, *" "); // size of file needs to be larger than 16 för att vara en entry
@@ -308,6 +310,14 @@ FS::cat(std::string filepath)
     int file_found = -1;
     int file_size;
 
+    // if file is dir but in pwd -> cannot cat a dir
+    if (dest_dir_bool == 0 && check_if_file_in_dir(dir, TYPE_DIR, filename.c_str()) != 0) {
+        std::cerr << "File is a directory." << '\n';
+        delete[] dir;
+        return -1;
+    }
+
+    // if destination is a dir but not in pwd -> get the file wanted.
     if (dest_dir_bool == 0) {
         // dest is directory, get block
         filepath = filepath.substr(0, filepath.rfind("/")+1);
@@ -671,7 +681,6 @@ FS::mv(std::string sourcepath, std::string destpath)
                 return 0;
             }
         }
-        // this->rm(sourcename); // LASTly remove!
     }
     return 0;
 }
@@ -692,23 +701,6 @@ FS::rm(std::string filepath)
     int dest_dir_bool = destination_dir_check(dir, filepath, filename);
     int dir_block = current_dir_block;
 
-    // FET EV, rmdir, inte rm för directories.
-    // if (dest_dir_bool == 0) {
-    //     // dest is directory, get block
-    //     filepath = filepath.substr(0, filepath.rfind("/")+1);
-    //     std::string original_path = current_working_dir;
-    //     std::vector<int> blocks = get_dir_blocks(filepath);
-    //     current_working_dir = original_path;
-    //     for (size_t i = 0; i < blocks.size(); i++) {
-    //         if (blocks[i] == -1) {
-    //             std::cerr << "Directory was not found." << '\n';
-    //             delete[] dir;
-    //             return -1;
-    //         }
-    //     }
-    //     dir_block = blocks[blocks.size()-1];
-    //     debug = this->disk.read(dir_block, (uint8_t*)dir);
-    // }
     // check if file already exists
     int found = -1;
     for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
