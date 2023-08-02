@@ -1,38 +1,6 @@
 #include <iostream>
 #include "fs.h"
 
-// runtests, kontroll
-// failade att ta hand om det finns mer än 64 entries i en dir || AVKLARAT
-// rm måste kolla om filen finns först.. || AVKLARAT
-// mkdir måste kolla om fil redan finns.. || AVKLARAT
-// pwd verkar inte fungera korrekt om man går tbx till root dir || AVKLARAT
-// behöver fixa privilegium kontroller.. || AVKLARAT
-// varför måste en fil vara minst 16 bitar? -- nej bara test filen som är fucked/terminalen || AVKLARAT
-// TASK 1:
-// varför måste en fil vara minst 16 bitar?|| AVKLARAT
-// TASK 2:
-// Khorosho|| AVKLARAT
-// TASK 3:
-// 17. om man tar bort en fil och sedan lägger till den || AVKLARAT
-//      och ssedan appendar den till annan fil så fuckas blocken upp? yes.|| AVKLARAT
-// gör hjälp funktioner när du arbetar med absolute paths. || AVKLARAT
-// task 4:
-// man kan mv en fil a till root även om a redan finns i root || AVKLARAT
-// TASKLE: -- testa program i ubuntu vm 18.04
-
-// alles klar med testerna, ska fixa paths för rm, append, cat, chmod
-// det finns en sak med testerna i test1. sizen är fel! debugga. ev måste size vara minst 16.
-// EV: så om size < 16 -> size = 16. klart
-// mv kan inte föra över större filer. klart
-// ANMÄRKNINGAR:
-// ls listar inte dirs först, försumbart?
-// from lab desc: Access rights of a file or directory should be ’rw-’ or ’rwx’ when the file or directory is created.
-// doesn't matter dir/file -- cd kollar inte privilegier, påpekades ej i labb beskrivningen.
-// absolute paths: cp och mv OK,create, cat, mkdir klart kvar: rm, append, chmod
-    // rmdir används för att ta bort dir i ubuntu, behöver ej beakta dirs i rm
-// långa namn kan inte tas hand om i strncpy av någon anledning, testade köra .size() vilket
-// fungerade men kanske bara i ubuntu terminalen det fuckas.
-
 /* ---------- Main Functions ----------*/
 
 // Constructor
@@ -283,11 +251,11 @@ FS::cp(std::string sourcepath, std::string destpath)
         return -1;
     }
 
-    // see if destname is a dir
+    // see if destname is dir
     int dest_dir_bool = destination_dir_check(dir, destpath, destname);
     int dir_block = current_dir_block;
     if (dest_dir_bool == 0) {
-        // dest is directory, get the correct block
+        // dest is another directory, get the correct block
         strncpy(new_file->file_name, sourcename.c_str(), sizeof(new_file->file_name));
         std::string original_path = current_working_dir;
         std::vector<int> blocks = get_dir_blocks(destpath);
@@ -340,7 +308,7 @@ FS::cp(std::string sourcepath, std::string destpath)
     }
     delete[] fat;
 
-    //add to entry to dir
+    //add entry to dir
     if (dest_dir_bool == 0) {
         debug = FS::save_entry_in_dir(dir_block, dest_dir, new_file);
     } else {
@@ -492,14 +460,14 @@ FS::rm(std::string filepath)
                 this->disk.write(current_dir_block, (uint8_t*)dir);
                 uint8_t* tmp = new uint8_t[BLOCK_SIZE];
                 debug = this->disk.read(FAT_BLOCK, tmp);
-                int16_t* fat = (int16_t*)tmp; // ev delete tmp
+                int16_t* fat = (int16_t*)tmp;
                 int tmp_block;
                 while (index_block != FAT_EOF && index_block != FAT_FREE) {
                     tmp_block = fat[index_block];
                     fat[index_block] = FAT_FREE;
                     index_block = tmp_block;
                 }
-                fat[index_block] = FAT_FREE; // recursive fat free.
+                fat[index_block] = FAT_FREE;
                 this->disk.write(FAT_BLOCK, (uint8_t*)fat);
                 delete[] dir, fat;
                 return 0;
@@ -534,7 +502,7 @@ FS::append(std::string filepath1, std::string filepath2)
     // see if source in CWD, if not -> bad write.
     dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
     int debug = this->disk.read(current_dir_block, (uint8_t*)dir);
-    // här behövs först kollas om source finns.
+    // check if source exist.
     if (check_if_file_in_dir(dir, TYPE_FILE, sourcename.c_str()) == 0) {
         delete[] dir;
         std::cerr << "That sourcefile doesn't exist." << '\n';
@@ -556,7 +524,7 @@ FS::append(std::string filepath1, std::string filepath2)
         return -2;
     }
 
-    uint8_t* tmp = new uint8_t[BLOCK_SIZE]; // behlöver deleteas. memory leaks.
+    uint8_t* tmp = new uint8_t[BLOCK_SIZE];
     debug = this->disk.read(FAT_BLOCK, tmp);
     int16_t* fat = (int16_t*)tmp;
 
@@ -579,7 +547,7 @@ FS::append(std::string filepath1, std::string filepath2)
                 }
                 fat[entry_handler->first_blk] = FAT_FREE;
                 break;
-            } // EV else här ist.
+            }
             if (dir[i].type == TYPE_DIR) {
                 std::cerr << "Destination file is a directory." << '\n';
                 delete[] dir, fat; delete entry_handler;
@@ -623,8 +591,8 @@ FS::mkdir(std::string dirpath)
     dir_entry* dest_dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
     debug = this->disk.read(current_dir_block, (uint8_t*)dir);
 
-    // if absolute path -> here needs to attain correct filename and root block.
-    uint8_t* tmp = new uint8_t[BLOCK_SIZE]; // EV
+    // get free block
+    uint8_t* tmp = new uint8_t[BLOCK_SIZE];
     debug = this->disk.read(FAT_BLOCK, tmp);
     int16_t* fat = (int16_t*)tmp;
     int free_block;
@@ -781,7 +749,7 @@ FS::chmod(std::string accessrights, std::string filepath)
         return -1;
     }
 
-    // see if dest in CWD, if not -> ok write.
+    // see if dest in CWD
     for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         if (strcmp(dir[i].file_name, filename.c_str()) == 0) {
             dir[i].access_rights = std::stoi(accessrights);
@@ -812,7 +780,7 @@ std::string FS::get_filename(std::string filepath) {
 std::string FS::gather_info_new_dir_entry(int file_type, dir_entry* new_file, std::string filename){
     // Start of new directory entry
     strncpy(new_file->file_name, filename.c_str(), sizeof(new_file->file_name));
-    new_file->access_rights = READ + WRITE + EXECUTE; // Access rights of a file or directory should be ’rw-’ or ’rwx’ when the file or directory is created. (7)
+    new_file->access_rights = READ + WRITE + EXECUTE; // Access rights of a file or directory should be ’rw-’ or ’rwx’ when the file or directory is created. (lab instuction)
     new_file->type = file_type;
 
     // Gather user input information
@@ -866,17 +834,17 @@ int FS::save_entry_on_disk(std::string data, int16_t* fat, dir_entry* new_file){
         }
     }
     new_file->first_blk = free_blocks[0];
-    int writing_block_size = BLOCK_SIZE-1; //-1
+    int writing_block_size = BLOCK_SIZE-1;
     std::string data_part;
     if (free_blocks.size() == 1) {
         fat[free_blocks[0]] = FAT_EOF;
-        this->disk.write(free_blocks[0], (uint8_t*)(char*)data.c_str()); //
+        this->disk.write(free_blocks[0], (uint8_t*)(char*)data.c_str());
     } else {
         int i = 0;
         while (i <= free_blocks.size()) {
             if (i+1 < free_blocks.size()) {
                 fat[free_blocks[i]] = free_blocks[i+1];
-                data_part = data.substr(i*writing_block_size, (i+1)*writing_block_size); // EV. här ligger felet! fixed
+                data_part = data.substr(i*writing_block_size, (i+1)*writing_block_size);
                 this->disk.write(free_blocks[i], (uint8_t*)(char*)data_part.c_str());
                 i++;
             } else {
@@ -975,7 +943,7 @@ std::string FS::gather_info_old_dir_entry(dir_entry* dir, dir_entry* new_file, s
         index_block = fat[index_block];
         count++;
     } while (index_block != FAT_EOF && index_block != FAT_FREE);
-    delete[] fat, block; // EV memory leaks
+    delete[] fat, block;
     return file_data; // return the data
 }
 
@@ -1095,7 +1063,7 @@ std::vector<int>FS::get_dir_blocks(std::string dirpath) {
             }
         }
     }
-    // ev delete[] dir
+    // ev. delete[] dir
     return dir_blocks;
 }
 
