@@ -742,18 +742,43 @@ FS::chmod(std::string accessrights, std::string filepath)
 
     //check if it exists in dir
     dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
-    int debug = this->disk.read(current_dir_block, (uint8_t*)dir);
+    int debug;
+
+    // see if destination is a dir
+    int dest_dir_bool = destination_dir_check(dir, filepath, filename);
+    int dir_block = current_dir_block;
+
+    // if destination is a dir but not in pwd -> get the file wanted.
+    if (dest_dir_bool == 0) {
+        // dest is directory, get block
+        if (filepath.find("/") != std::string::npos) {
+            filepath = filepath.substr(0, filepath.rfind("/")+1);
+        }
+        std::string original_path = current_working_dir;
+        std::vector<int> blocks = get_dir_blocks(filepath);
+        current_working_dir = original_path;
+        for (size_t i = 0; i < blocks.size(); i++) {
+            if (blocks[i] == -1) {
+                std::cerr << "Directory was not found." << '\n';
+                delete[] dir;
+                return -1;
+            }
+        }
+        dir_block = blocks[blocks.size()-1];
+    }
+    debug = this->disk.read(dir_block, (uint8_t*)dir);
+
     if (check_if_file_in_dir(dir, TYPE_FILE, filename.c_str()) == 0) {
         delete[] dir;
         std::cerr << "That file doesn't exist." << '\n';
         return -1;
     }
 
-    // see if dest in CWD
+    // change privilege
     for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         if (strcmp(dir[i].file_name, filename.c_str()) == 0) {
             dir[i].access_rights = std::stoi(accessrights);
-            this->disk.write(current_dir_block, (uint8_t*)dir);
+            this->disk.write(dir_block, (uint8_t*)dir);
             delete[] dir;
             return 0;
         }
