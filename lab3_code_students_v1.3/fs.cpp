@@ -439,12 +439,12 @@ FS::rm(std::string filepath)
     }
     dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
     int debug = this->disk.read(current_dir_block, (uint8_t*)dir);
-    // see if in dir, if not -> error.
+    
     // see if destname is a dir
     int dest_dir_bool = destination_dir_check(dir, filepath, filename);
     int dir_block = current_dir_block;
 
-    // check if file already exists
+    // remove and see if file even was found
     int found = -1;
     for (size_t i = 0; i < BLOCK_SIZE/DIR_ENTRY_SIZE; i++) {
         if (strcmp(dir[i].file_name, filename.c_str()) == 0) {
