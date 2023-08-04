@@ -439,7 +439,7 @@ FS::rm(std::string filepath)
     }
     dir_entry* dir = new dir_entry[BLOCK_SIZE/DIR_ENTRY_SIZE];
     int debug = this->disk.read(current_dir_block, (uint8_t*)dir);
-    
+
     // see if destname is a dir
     int dest_dir_bool = destination_dir_check(dir, filepath, filename);
     int dir_block = current_dir_block;
@@ -511,6 +511,11 @@ FS::append(std::string filepath1, std::string filepath2)
     if (check_if_file_in_dir(dir, TYPE_FILE, destname.c_str()) == 0) {
         delete[] dir;
         std::cerr << "That destinationfile doesn't exist." << '\n';
+        return -1;
+    }
+    if (check_if_file_in_dir(dir, TYPE_DIR, sourcename.c_str()) == -2) {
+        delete[] dir;
+        std::cerr << "Cannot append a dir to a file." << '\n';
         return -1;
     }
 
