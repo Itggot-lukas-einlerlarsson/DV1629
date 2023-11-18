@@ -33,7 +33,7 @@ FS::format()
     delete[] root_dir;
     // block nr 1 is File Allocation Table, set all blocks as free except first two blocks.
     int16_t* fat = new int16_t[BLOCK_SIZE/2]; // Whole FAT in one block, we can address 4096 / 2 = 2048 disk blocks in a partition
-    fat[0] = FAT_EOF; fat[1] = FAT_EOF; // first two blocks are occupied
+    fat[0] = FAT_EOF; fat[1] = FAT_EOF; // first two blocks are occupied, block 0 is root dir, block 1 is FAT table itself
     for (size_t i = 2; i < BLOCK_SIZE/2; i++) {
         fat[i] = FAT_FREE;
     }
@@ -402,8 +402,8 @@ FS::mv(std::string sourcepath, std::string destpath)
                     this->disk.write(current_dir_block, (uint8_t*)dir);
                     break;
                 }
-            } else { // EV, kanske funkar ändå
-                std::cerr << "Cannot move directory." << '\n';
+            } else {
+                // std::cerr << "Cannot move directory." << '\n';
                 delete[] dir, dest_dir; delete entry_handler;
                 return -1;
             }
@@ -1093,12 +1093,11 @@ std::vector<int>FS::get_dir_blocks(std::string dirpath) {
             }
         }
     }
-    // ev. delete[] dir
     return dir_blocks;
 }
 
 // ANDing the required privilege with present access rights to see if they
-// exist in the present accessrights
+// exist in the present accessrights -> e.g. file rwx -> 111 & 100 -> 100 == 100
 int FS::privilege_check(uint8_t access_rights, uint8_t required_privilege) {
     if ((access_rights & required_privilege) == required_privilege) {
         return 0;
